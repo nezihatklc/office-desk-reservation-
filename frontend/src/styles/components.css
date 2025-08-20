@@ -101,7 +101,13 @@
   box-shadow: 0 10px 30px rgba(0,0,0,0.25);
 }
 
-.auth-hint { margin-top: 12px; text-align: center; }
+.auth-hint {
+  margin-top: 12px;
+  margin-bottom: 20px; 
+  text-align: center;
+  color: var(--brand-900); 
+}
+
 
 
 /* Logo for login card */
@@ -122,3 +128,19 @@
 .auth-card .input::placeholder {
   color: #6E8597;
 }
+
+/* Register-specific  */
+.auth-card .error-text { color: #d93025; font-size: 12px; margin-top: 4px; }
+.auth-card .hints      { margin-top: 6px; font-size: 12px; line-height: 1.25; }
+.auth-card .hint-ok    { color: #1a9e55; }  /* success */
+.auth-card .hint-bad   { color: #d93025; }  /* error */
+
+.form-two { display: grid; gap: var(--gap); }
+@media (min-width: 560px) {
+  .form-two { grid-template-columns: 1fr 1fr; }
+}
+
+.card p { color: var(--brand-900); }
+.auth-card .label { color: var(--brand-900); }
+
+.auth-card .link { color: var(--brand-700); font-weight: 600; }
