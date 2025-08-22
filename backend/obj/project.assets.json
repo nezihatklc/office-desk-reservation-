@@ -80,11 +80,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/akaduy.22/RiderProjects/backend/backend/backend.csproj",
+      "projectUniqueName": "/Users/akaduy.22/Desktop/office-desk-reservation-/backend/backend.csproj",
       "projectName": "backend",
-      "projectPath": "/Users/akaduy.22/RiderProjects/backend/backend/backend.csproj",
+      "projectPath": "/Users/akaduy.22/Desktop/office-desk-reservation-/backend/backend.csproj",
       "packagesPath": "/Users/akaduy.22/.nuget/packages/",
-      "outputPath": "/Users/akaduy.22/RiderProjects/backend/backend/obj/",
+      "outputPath": "/Users/akaduy.22/Desktop/office-desk-reservation-/backend/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/Users/akaduy.22/.nuget/NuGet/NuGet.Config"
