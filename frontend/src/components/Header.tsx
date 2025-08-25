@@ -9,30 +9,28 @@ export default function Header() {
   const { pathname } = useLocation();
 
   const isAuthPage = pathname === "/login" || pathname === "/register";
-   if (isAuthPage) {
-    return null;
-  }
+  if (isAuthPage) return null;
 
   return (
     <header className="app-header">
       <nav className="app-nav">
         <img src={logoUrl} alt="Company logo" className="logo" />
-        {!isAuthPage && (
+        {/* Sol menü */}
+        <Link className="link" to="/floor">Floor</Link>
+        <Link className="link" to="/me">My Reservations</Link>
+
+        <div className="push-right" />
+
+        {/* Sağ taraf */}
+        {user && (
           <>
-            <Link className="link" to="/floor">Floor</Link>
-            <Link className="link" to="/me">My Reservations</Link>
-            <div className="push-right" />
-            {user && (
-              <>
-                <span>Signed in as <strong>{user.email}</strong></span>
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => { signOut(); nav("/login", { replace: true }); }}
-                >
-                  Sign out
-                </button>
-              </>
-            )}
+            <span>Signed in as <strong>{user.email}</strong></span>
+            <button
+              className="btn btn-ghost"
+              onClick={() => { signOut(); nav("/login", { replace: true }); }}
+            >
+              Sign out
+            </button>
           </>
         )}
       </nav>
