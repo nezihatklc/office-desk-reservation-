@@ -17,19 +17,14 @@ public partial class AppDbContext : DbContext
     }
 
     public virtual DbSet<AuditLog> AuditLogs { get; set; }
-
     public virtual DbSet<Booking> Bookings { get; set; }
-
     public virtual DbSet<Desk> Desks { get; set; }
-
     public virtual DbSet<Facility> Facilities { get; set; }
-
     public virtual DbSet<User> Users { get; set; }
-
     public virtual DbSet<Workspace> Workspaces { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+#warning Move your connection string to appsettings.json for safety
         => optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=Andromeda;Username=postgres;Password=yourpassword");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -38,21 +33,15 @@ public partial class AppDbContext : DbContext
             .HasPostgresExtension("btree_gist")
             .HasPostgresExtension("citext");
 
+        // === AUDIT LOGS ===
         modelBuilder.Entity<AuditLog>(entity =>
         {
             entity.HasKey(e => e.LogId).HasName("audit_logs_pkey");
-
             entity.ToTable("audit_logs");
 
-            entity.Property(e => e.LogId)
-                .ValueGeneratedNever()
-                .HasColumnName("log_id");
-            entity.Property(e => e.Action)
-                .HasMaxLength(100)
-                .HasColumnName("action");
-            entity.Property(e => e.LogTime)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnName("log_time");
+            entity.Property(e => e.LogId).UseIdentityAlwaysColumn().HasColumnName("log_id");
+            entity.Property(e => e.Action).HasMaxLength(100).HasColumnName("action");
+            entity.Property(e => e.LogTime).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("log_time");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
             entity.HasOne(d => d.User).WithMany(p => p.AuditLogs)
@@ -60,26 +49,18 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("audit_logs_user_id_fkey");
         });
 
+        // === BOOKINGS ===
         modelBuilder.Entity<Booking>(entity =>
         {
             entity.HasKey(e => e.BookingId).HasName("bookings_pkey");
-
             entity.ToTable("bookings");
 
-            entity.Property(e => e.BookingId).HasColumnName("booking_id");
-            entity.Property(e => e.BookingEnd)
-                .HasDefaultValueSql("(date_trunc('day'::text, CURRENT_TIMESTAMP) + '18:00:00'::interval)")
-                .HasColumnName("booking_end");
-            entity.Property(e => e.BookingStart)
-                .HasDefaultValueSql("(date_trunc('day'::text, CURRENT_TIMESTAMP) + '09:00:00'::interval)")
-                .HasColumnName("booking_start");
-            entity.Property(e => e.Created)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnName("created");
+            entity.Property(e => e.BookingId).UseIdentityAlwaysColumn().HasColumnName("booking_id");
+            entity.Property(e => e.BookingEnd).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '18:00:00'::interval)").HasColumnName("booking_end");
+            entity.Property(e => e.BookingStart).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '09:00:00'::interval)").HasColumnName("booking_start");
+            entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
             entity.Property(e => e.DeskId).HasColumnName("desk_id");
-            entity.Property(e => e.Status)
-                .HasMaxLength(50)
-                .HasColumnName("status");
+            entity.Property(e => e.Status).HasMaxLength(50).HasColumnName("status");
             entity.Property(e => e.UserId).HasColumnName("user_id");
 
             entity.HasOne(d => d.Desk).WithMany(p => p.Bookings)
@@ -91,24 +72,18 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("bookings_user_id_fkey");
         });
 
+        // === DESKS ===
         modelBuilder.Entity<Desk>(entity =>
         {
             entity.HasKey(e => e.DeskId).HasName("desks_pkey");
-
             entity.ToTable("desks");
 
             entity.HasIndex(e => e.DeskCode, "desks_desk_code_key").IsUnique();
 
-            entity.Property(e => e.DeskId)
-                .ValueGeneratedNever()
-                .HasColumnName("desk_id");
-            entity.Property(e => e.Created)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnName("created");
+            entity.Property(e => e.DeskId).UseIdentityAlwaysColumn().HasColumnName("desk_id");
+            entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
             entity.Property(e => e.CreatedBy).HasColumnName("created_by");
-            entity.Property(e => e.DeskCode)
-                .HasMaxLength(20)
-                .HasColumnName("desk_code");
+            entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
             entity.Property(e => e.Isactive).HasColumnName("isactive");
             entity.Property(e => e.WorkspaceId).HasColumnName("workspace_id");
 
@@ -139,50 +114,36 @@ public partial class AppDbContext : DbContext
                     });
         });
 
+        // === FACILITIES ===
         modelBuilder.Entity<Facility>(entity =>
         {
             entity.HasKey(e => e.FacilityId).HasName("facilities_pkey");
-
             entity.ToTable("facilities");
 
             entity.HasIndex(e => e.Name, "facilities_name_key").IsUnique();
 
-            entity.Property(e => e.FacilityId)
-                .ValueGeneratedNever()
-                .HasColumnName("facility_id");
+            entity.Property(e => e.FacilityId).UseIdentityAlwaysColumn().HasColumnName("facility_id");
             entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.Name)
-                .HasMaxLength(100)
-                .HasColumnName("name");
+            entity.Property(e => e.Name).HasMaxLength(100).HasColumnName("name");
         });
 
+        // === USERS ===
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(e => e.UserId).HasName("users_pkey");
-
             entity.ToTable("users");
 
             entity.HasIndex(e => e.Email, "users_email_key").IsUnique();
 
             entity.Property(e => e.UserId)
-                .ValueGeneratedNever()
+                .UseIdentityAlwaysColumn()    // <-- instead of ValueGeneratedNever
                 .HasColumnName("user_id");
-            entity.Property(e => e.Created)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnName("created");
+            entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
             entity.Property(e => e.CreatedBy).HasColumnName("created_by");
-            entity.Property(e => e.Email)
-                .HasColumnType("citext")
-                .HasColumnName("email");
-            entity.Property(e => e.FirstName)
-                .HasMaxLength(50)
-                .HasColumnName("first_name");
-            entity.Property(e => e.LastName)
-                .HasMaxLength(50)
-                .HasColumnName("last_name");
-            entity.Property(e => e.Password)
-                .HasMaxLength(100)
-                .HasColumnName("password");
+            entity.Property(e => e.Email).HasColumnType("citext").HasColumnName("email");
+            entity.Property(e => e.FirstName).HasMaxLength(50).HasColumnName("first_name");
+            entity.Property(e => e.LastName).HasMaxLength(50).HasColumnName("last_name");
+            entity.Property(e => e.Password).HasMaxLength(100).HasColumnName("password");
 
             entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.InverseCreatedByNavigation)
                 .HasForeignKey(d => d.CreatedBy)
@@ -190,29 +151,19 @@ public partial class AppDbContext : DbContext
                 .HasConstraintName("users_created_by_fkey");
         });
 
+        // === WORKSPACES ===
         modelBuilder.Entity<Workspace>(entity =>
         {
             entity.HasKey(e => e.WorkspaceId).HasName("workspaces_pkey");
-
             entity.ToTable("workspaces");
 
             entity.HasIndex(e => e.DeskCode, "workspaces_desk_code_key").IsUnique();
 
-            entity.Property(e => e.WorkspaceId)
-                .ValueGeneratedNever()
-                .HasColumnName("workspace_id");
-            entity.Property(e => e.Created)
-                .HasDefaultValueSql("CURRENT_TIMESTAMP")
-                .HasColumnName("created");
-            entity.Property(e => e.DeskCode)
-                .HasMaxLength(20)
-                .HasColumnName("desk_code");
-            entity.Property(e => e.FloorNumber)
-                .HasDefaultValueSql("'2nd Floor'::text")
-                .HasColumnName("floor_number");
-            entity.Property(e => e.WorkspaceName)
-                .HasMaxLength(50)
-                .HasColumnName("workspace_name");
+            entity.Property(e => e.WorkspaceId).UseIdentityAlwaysColumn().HasColumnName("workspace_id");
+            entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
+            entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
+            entity.Property(e => e.FloorNumber).HasDefaultValueSql("'2nd Floor'::text").HasColumnName("floor_number");
+            entity.Property(e => e.WorkspaceName).HasMaxLength(50).HasColumnName("workspace_name");
         });
 
         OnModelCreatingPartial(modelBuilder);

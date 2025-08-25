@@ -1,10 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace backend.Models;
 
 public partial class User
 {
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)] // 👈 EF will let Postgres auto-generate UserId
     public int UserId { get; set; }
 
     public string FirstName { get; set; } = null!;
@@ -15,7 +17,7 @@ public partial class User
 
     public string Password { get; set; } = null!;
 
-    public DateTime Created { get; set; }
+    public DateTime Created { get; set; } = DateTime.UtcNow;
 
     public int? CreatedBy { get; set; }
 
