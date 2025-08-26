@@ -1,14 +1,14 @@
 using backend.Models;
-using System.Collections.Generic;
 
 namespace backend.Repositories
 {
     public interface IUserRepository
     {
-        void Add(User user);
-        IEnumerable<User> GetAll();
-        User? GetById(int id);
-        void Update(User user);
-        void Delete(int id);
+        Task<List<User>> GetAllAsync();
+        Task<User?> GetByIdAsync(int id);
+        Task<User?> GetByEmailAsync(string email);
+        Task AddAsync(User user);
+        Task UpdateAsync(User user);
+        Task DeleteAsync(int id);
     }
 }

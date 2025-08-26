@@ -1,8 +1,6 @@
 using backend.Data;
 using backend.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace backend.Repositories
 {
@@ -15,35 +13,40 @@ namespace backend.Repositories
             _context = context;
         }
 
-        public void Add(User user)
+        public async Task AddAsync(User user)
         {
             _context.Users.Add(user);
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
         }
 
-        public IEnumerable<User> GetAll()
+        public async Task<List<User>> GetAllAsync()
         {
-            return _context.Users.ToList();
+            return await _context.Users.ToListAsync();
         }
 
-        public User? GetById(int id)
+        public async Task<User?> GetByIdAsync(int id)
         {
-            return _context.Users.FirstOrDefault(u => u.UserId == id);
+            return await _context.Users.FirstOrDefaultAsync(u => u.UserId == id);
         }
 
-        public void Update(User user)
+        public async Task<User?> GetByEmailAsync(string email)   // ✅ implementation
+        {
+            return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+        }
+
+        public async Task UpdateAsync(User user)
         {
             _context.Users.Update(user);
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
         }
 
-        public void Delete(int id)
+        public async Task DeleteAsync(int id)
         {
-            var user = _context.Users.FirstOrDefault(u => u.UserId == id);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == id);
             if (user != null)
             {
                 _context.Users.Remove(user);
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
             }
         }
     }

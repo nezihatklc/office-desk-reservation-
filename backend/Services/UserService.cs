@@ -3,86 +3,88 @@ using backend.DTOs;
 using backend.Models;
 using backend.Repositories;
 using backend.Exceptions;
-using BCrypt.Net;
 
-public class UserService
+namespace backend.Services
 {
-    private readonly IUserRepository _userRepository;
-
-    public UserService(IUserRepository userRepository)
+    public class UserService
     {
-        _userRepository = userRepository;
-    }
+        private readonly IUserRepository _userRepository;
 
-    public UserResponse Register(RegisterRequest request)
-    {
-        //req field val
-        if (string.IsNullOrWhiteSpace(request.Email) ||
-            string.IsNullOrWhiteSpace(request.Password))
-            throw new BadRequestException("Email and Password are required.");
-
-        //email format val
-        if (!request.Email.Contains("@"))
-            throw new BadRequestException("Invalid email format.");
-
-        //pword rules
-        if (request.Password.Length < 12)
-            throw new BadRequestException("Password must be at least 12 characters long.");
-        if (!Regex.IsMatch(request.Password, @"[!@#$%^&*(),.?""{}|<>]"))
-            throw new BadRequestException("Password must contain at least one special character.");
-        if (!Regex.IsMatch(request.Password, @"\d"))
-            throw new BadRequestException("Password must contain at least one digit.");
-        if (!Regex.IsMatch(request.Password, @"[A-Z]"))
-            throw new BadRequestException("Password must contain at least one uppercase letter.");
-
-        //should be unique email
-        var existingUser = _userRepository.GetAll().FirstOrDefault(u => u.Email == request.Email);
-        if (existingUser != null)
-            throw new ConflictException("User with this email already exists.");
-
-        //has psswrd
-        var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
-
-        var user = new User
+        public UserService(IUserRepository userRepository)
         {
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            Email = request.Email,
-            Password = hashedPassword,
-            CreatedBy = request.CreatedBy
-        };
+            _userRepository = userRepository;
+        }
 
-        _userRepository.Add(user);
-
-        return new UserResponse
+        public async Task<UserResponse> Register(RegisterRequest request)
         {
-            UserId = user.UserId,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            Email = user.Email,
-            Created = user.Created
-        };
-    }
+            // Validate required fields
+            if (string.IsNullOrWhiteSpace(request.Email) ||
+                string.IsNullOrWhiteSpace(request.Password))
+                throw new BadRequestException("Email and Password are required.");
 
-    public UserResponse Login(string email, string password)
-    {
-        var user = _userRepository.GetAll().FirstOrDefault(u => u.Email == email);
+            // Validate email format
+            if (!Regex.IsMatch(request.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+                throw new BadRequestException("Invalid email format.");
 
-        if (user == null)
-            throw new UnauthorizedException("Invalid email or password.");
+            // Validate password rules
+            if (request.Password.Length < 12)
+                throw new BadRequestException("Password must be at least 12 characters long.");
+            if (!Regex.IsMatch(request.Password, @"[!@#$%^&*(),.?""{}|<>]"))
+                throw new BadRequestException("Password must contain at least one special character.");
+            if (!Regex.IsMatch(request.Password, @"\d"))
+                throw new BadRequestException("Password must contain at least one digit.");
+            if (!Regex.IsMatch(request.Password, @"[A-Z]"))
+                throw new BadRequestException("Password must contain at least one uppercase letter.");
 
-        //verify hashhed password
-        bool validPassword = BCrypt.Net.BCrypt.Verify(password, user.Password);
-        if (!validPassword)
-            throw new UnauthorizedException("Invalid email or password.");
+            // Check for unique email
+            var existingUser = await _userRepository.GetByEmailAsync(request.Email);
+            if (existingUser != null)
+                throw new ConflictException("User with this email already exists.");
 
-        return new UserResponse
+            // Hash password
+            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
+            var user = new User
+            {
+                FirstName = request.FirstName,
+                LastName = request.LastName,
+                Email = request.Email,
+                Password = hashedPassword,
+                CreatedBy = request.CreatedBy,
+                Created = DateTime.UtcNow
+            };
+
+            await _userRepository.AddAsync(user);
+
+            return new UserResponse
+            {
+                UserId = user.UserId,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Created = user.Created
+            };
+        }
+
+        public async Task<UserResponse> Login(string email, string password)
         {
-            UserId = user.UserId,
-            FirstName = user.FirstName,
-            LastName = user.LastName,
-            Email = user.Email,
-            Created = user.Created
-        };
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null)
+                throw new UnauthorizedException("Invalid email or password.");
+
+            // Verify hashed password
+            bool validPassword = BCrypt.Net.BCrypt.Verify(password, user.Password);
+            if (!validPassword)
+                throw new UnauthorizedException("Invalid email or password.");
+
+            return new UserResponse
+            {
+                UserId = user.UserId,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Created = user.Created
+            };
+        }
     }
 }

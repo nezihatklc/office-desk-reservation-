@@ -40,5 +40,21 @@ namespace backend.Repositories
                 await _context.SaveChangesAsync();
             }
         }
+
+        public async Task<List<Booking>> GetByUserIdAsync(int userId) =>
+            await _context.Bookings.Where(b => b.UserId == userId).ToListAsync();
+
+        public async Task<List<Booking>> GetByDeskIdAsync(int deskId) =>
+            await _context.Bookings.Where(b => b.DeskId == deskId).ToListAsync();
+
+        public async Task<bool> HasOverlapAsync(int deskId, DateTime start, DateTime end)
+        {
+            return await _context.Bookings.AnyAsync(b =>
+                b.DeskId == deskId &&
+                ((start >= b.BookingStart && start < b.BookingEnd) ||
+                 (end > b.BookingStart && end <= b.BookingEnd) ||
+                 (start <= b.BookingStart && end >= b.BookingEnd))
+            );
+        }
     }
 }
