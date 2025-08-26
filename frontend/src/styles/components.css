@@ -1,4 +1,4 @@
-/* ===== Component Styles ===== */
+/* ===== Component Styles (DFDS colors, fixed names) ===== */
 
 /* Buttons */
 .btn {
@@ -13,134 +13,165 @@
 .btn:active { transform: translateY(1px); }
 
 .btn-primary {
-  color: var(--text-on-light);
-  background: var(--brand-300);
-  border-color: var(--brand-300);
+  color: var(--colors-text-light-primary, #ffffff);
+  background: var(--colors-primary-main, #002b45);
+  border-color: var(--colors-primary-main, #002b45);
 }
 .btn-primary:hover { filter: brightness(1.05); }
-.btn-primary:focus-visible { box-shadow: 0 0 0 3px var(--ring); }
+.btn-primary:focus-visible {
+  box-shadow: 0 0 0 3px var(--colors-secondary-main, #49a2df);
+}
 
 .btn-ghost {
-  color: var(--brand-300);
+  color: var(--colors-primary-main, #002b45);
   background: transparent;
-  border-color: rgba(255,255,255,0.15);
+  border-color: var(--colors-divider-dark, #d4d4d4);
 }
-.btn-ghost:hover { background: rgba(255,255,255,0.06); }
+.btn-ghost:hover {
+  background: var(--colors-surface-secondary, #eef0f1);
+}
 
 /* Inputs */
 .input {
   width: 100%;
   padding: 10px 12px;
   border-radius: var(--radius);
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(255,255,255,0.04);
-  color: var(--text-on-dark);
+  border: 1px solid var(--colors-divider-dark, #d4d4d4);
+  background: var(--colors-surface-primary, #ffffff);
+  color: var(--colors-text-dark-primary, #4d4e4c);
 }
-.input::placeholder { color: #a8c2d3; }
-.input:focus { 
-  outline: none; 
-  border-color: var(--brand-300); 
-  box-shadow: 0 0 0 3px var(--ring); 
+.input::placeholder { color: var(--colors-text-dark-secondary, #4d4e4c); }
+.input:focus {
+  outline: none;
+  border-color: var(--colors-primary-main, #002b45);
+  box-shadow: 0 0 0 3px var(--colors-secondary-main, #49a2df);
 }
 
 /* Labels */
-.label { font-size: 0.9rem; margin-bottom: 4px; color: var(--text-on-dark); }
+.label {
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+  color: var(--colors-text-dark-primary, #4d4e4c);
+}
 
 /* Links */
-.link { color: var(--brand-300); font-weight: 600; }
+.link {
+  color: var(--colors-secondary-main, #49a2df);
+  font-weight: 600;
+}
 .link:hover { text-decoration: underline; }
 
 /* Badges */
 .badge {
-  display:inline-flex; 
-  align-items:center; 
+  display:inline-flex;
+  align-items:center;
   gap:6px;
-  background: rgba(146,195,227,0.12);
-  border:1px solid rgba(146,195,227,0.35);
-  color: var(--brand-300);
+  background: var(--colors-secondary-light, #bbddf3);
+  border:1px solid var(--colors-secondary-main, #49a2df);
+  color: var(--colors-secondary-dark, #1874bc);
   border-radius: 999px;
-  padding: 4px 10px; 
+  padding: 4px 10px;
   font-size: 12px;
 }
-/* Auth page layout: center nicely below header */
+
+/* Auth page layout */
 .auth-page {
-  min-height: calc(100dvh - 56px); /* header height approx */
+  min-height: calc(100dvh - 56px);
   display: grid;
   place-items: center;
   padding: 24px;
 }
 
-/* Larger, responsive card for auth */
+/* Auth card */
 .auth-card {
   width: min(560px, 92vw);
   padding: clamp(22px, 2.8vw, 32px);
 }
 
-/* Title scale */
+/* Title */
 .auth-title {
   margin: 0 0 12px;
   font-size: clamp(1.25rem, 1.2rem + 0.6vw, 1.6rem);
   text-align: center;
+  color: var(--colors-primary-main, #002b45);
 }
 
-/* Form spacing & input sizing */
+/* Form spacing */
 .form { display: grid; gap: 14px; margin-top: 12px; }
 .form-field { display: grid; gap: 6px; }
 .auth-card .input { padding: 12px 14px; font-size: 15px; }
 
-/* Primary CTA full width + a bit larger */
+/* CTA buttons */
 .btn-block { width: 100%; }
 .btn-lg    { padding: 12px 14px; font-size: 15px; }
 
-/* Softer card look on dark background */
+/* Card look */
 .card {
-  background: #ffffff;                   
-  color: var(--brand-900);
-  border: 1px solid rgba(0,0,0,0.06);
+  background: var(--colors-surface-primary, #ffffff);
+  color: var(--colors-text-dark-primary, #4d4e4c);
+  border: 1px solid var(--colors-divider-dark, #d4d4d4);
   border-radius: var(--radius-lg);
   box-shadow: 0 10px 30px rgba(0,0,0,0.25);
 }
 
 .auth-hint {
   margin-top: 12px;
-  margin-bottom: 20px; 
+  margin-bottom: 20px;
   text-align: center;
-  color: var(--brand-900); 
+  color: var(--colors-text-dark-secondary, #4d4e4c);
 }
 
-
-
-/* Logo for login card */
+/* Logo */
 .login-logo {
-  width: 120px;           
+  width: 120px;
   display: block;
-  margin: 0 auto 20px;    
+  margin: 0 auto 20px;
 }
 
+/* Inputs inside card */
 .auth-card .input {
   padding: 12px 14px;
   font-size: 15px;
-  background: #ffffff;   /* white */
-  color: #002B45;        /* dark blue */
-  border: 1px solid #92C3E3;
+  background: var(--colors-surface-primary, #ffffff);
+  color: var(--colors-text-dark-primary, #4d4e4c);
+  border: 1px solid var(--colors-primary-light, #345370);
 }
-
 .auth-card .input::placeholder {
-  color: #6E8597;
+  color: var(--colors-text-dark-secondary, #4d4e4c);
 }
 
-/* Register-specific  */
-.auth-card .error-text { color: #d93025; font-size: 12px; margin-top: 4px; }
+/* Register-specific */
+.auth-card .error-text { color: var(--colors-status-alert, #be1e2d); font-size: 12px; margin-top: 4px; }
 .auth-card .hints      { margin-top: 6px; font-size: 12px; line-height: 1.25; }
-.auth-card .hint-ok    { color: #1a9e55; }  /* success */
-.auth-card .hint-bad   { color: #d93025; }  /* error */
+.auth-card .hint-ok    { color: var(--colors-status-success, #4caf50); }
+.auth-card .hint-bad   { color: var(--colors-status-alert, #be1e2d); }
 
 .form-two { display: grid; gap: var(--gap); }
 @media (min-width: 560px) {
   .form-two { grid-template-columns: 1fr 1fr; }
 }
 
-.card p { color: var(--brand-900); }
-.auth-card .label { color: var(--brand-900); }
+.card p { color: var(--colors-text-dark-primary, #4d4e4c); }
+.auth-card .label { color: var(--colors-text-dark-primary, #4d4e4c); }
 
-.auth-card .link { color: var(--brand-700); font-weight: 600; }
+.auth-card .link { color: var(--colors-primary-light, #345370); font-weight: 600; }
+
+
+.legend-grid .row {
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  letter-spacing: .2px;
+}
+.legend-grid .status-dot {
+  width: 12px; height: 12px; border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.15) inset;
+}
+
+.panel-glass h2 {
+  color: var(--colors-primary-main);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+.panel-glass p, .panel-glass .label, .panel-glass .link { color: var(--colors-text-dark-primary); }

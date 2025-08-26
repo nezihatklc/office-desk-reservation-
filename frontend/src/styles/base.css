@@ -7,7 +7,7 @@ html, body, #root { height: 100%; }
 body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
-  background: var(--brand-900);
+  background: linear-gradient(180deg, #013554 0%, #002B45 60%, #001C2D 100%);
   color: var(--text-on-dark);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

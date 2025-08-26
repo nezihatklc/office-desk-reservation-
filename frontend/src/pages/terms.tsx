@@ -6,7 +6,9 @@ export default function Terms() {
     <div className="auth-page">
       <article className="card auth-card" role="document" aria-labelledby="terms-title">
         <h1 id="terms-title" className="auth-title">Terms & Conditions</h1>
-        <p className="auth-hint">Last updated: 20 Aug 2025</p>
+        <p className="auth-hint">
+          Last updated: {new Date(2025, 7, 20).toLocaleDateString()}
+        </p>
 
         <div className="form" style={{marginTop: 8}}>
           <section className="form-field">
