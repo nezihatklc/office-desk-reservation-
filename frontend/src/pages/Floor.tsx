@@ -1,16 +1,19 @@
 import React, { useMemo, useState } from "react";
+import { useAuth } from "../auth/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { createReservation } from "../lib/reservations";
 
 // ==== Types ====
 type Desk = {
   id: string;
   label: string;
-  seats: number;            // koltuk sayısı (küçük noktalar)
-  // Grid konumu (1‑indexed)
+  seats: number;            // small seat dots
+  // Grid position (1-indexed)
   colStart: number;
   colEnd: number;
   rowStart: number;
   rowEnd: number;
-  zone?: string;            // A bloğu, Phone Booth vs.
+  zone?: string;            // A block, Phone Booth, etc.
 };
 
 type Booking = {
@@ -21,8 +24,8 @@ type Booking = {
   byRequest?: boolean;
 };
 
-// ==== Mock Data (örnek kat planı) ====
-// 24x14 grid üzerinde birkaç ada
+// ==== Mock Data (sample floor plan) ====
+// A few islands on a 24x14 grid
 const DESKS: Desk[] = [
   { id: "A1", label: "A1", seats: 6, colStart: 3, colEnd: 7, rowStart: 4, rowEnd: 6, zone: "A" },
   { id: "A2", label: "A2", seats: 6, colStart: 8, colEnd: 12, rowStart: 4, rowEnd: 6, zone: "A" },
@@ -50,7 +53,7 @@ function overlap(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return Math.max(A1, B1) < Math.min(A2, B2);
 }
 
-// Renk efsanesi
+// Color legend
 const LEGEND = {
   byMe: "#69a7ff",        // Booked by me
   booked: "#f87171",      // Booked
@@ -59,7 +62,7 @@ const LEGEND = {
   byRequest: "#fbbf24",   // By request
 };
 
-// Küçük koltuk noktaları üret
+// Render small seat dots
 function Seats({ count, status }: { count: number; status: keyof typeof LEGEND }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 10px)", gap: 4 }}>
@@ -78,14 +81,33 @@ function Seats({ count, status }: { count: number; status: keyof typeof LEGEND }
   );
 }
 
+// ---- Istanbul-aware date helpers (MVP uses "today") ----
+function todayISOInIstanbul(): string {
+  // Returns "YYYY-MM-DD" for Europe/Istanbul
+  const f = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return f.format(new Date()); // en-CA -> YYYY-MM-DD
+}
+function buildDateInIstanbul(timeHHMM: string): Date {
+  // Build a Date for "today @ HH:MM" in Europe/Istanbul
+  const dateStr = todayISOInIstanbul(); // YYYY-MM-DD
+  return new Date(`${dateStr}T${timeHHMM}:00`);
+}
+
 // ==== Page ====
 export default function Reservation() {
   const [start, setStart] = useState("12:27");
   const [end, setEnd] = useState("18:00");
   const [selectedDesk, setSelectedDesk] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
-  // Seçili saat aralığına göre availability
+  // Compute availability given the selected time window
   const deskStatus = useMemo(() => {
     const map = new Map<string, keyof typeof LEGEND>();
     DESKS.forEach(d => map.set(d.id, "available"));
@@ -108,9 +130,34 @@ export default function Reservation() {
 
   const selected = DESKS.find(d => d.id === selectedDesk) ?? null;
 
+  // Confirm & create reservation (uses adapter; later this becomes an API call)
+  async function handleReserve() {
+    if (!selected) {
+      alert("Please select a desk from the plan first.");
+      return;
+    }
+
+    // ✅ ALWAYS unique numeric id based on index in DESKS (no collisions across zones)
+    const numericDeskId = DESKS.findIndex(d => d.id === selected.id) + 1;
+
+    const startDt = buildDateInIstanbul(start);
+    const endDt = buildDateInIstanbul(end);
+
+    await createReservation(
+      numericDeskId,
+      startDt,
+      endDt,
+      user?.email || "",
+      selected.label // ✅ also persist human-readable label
+    );
+
+    // Navigate to Profile/My Reservations so the user can see it
+    navigate("/me");
+  }
+
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 16, height: "100vh", padding: 16 }}>
-      {/* Sol: Üst bar + plan + timeline */}
+      {/* Left: top controls + plan + timeline */}
       <div style={{ display: "grid", gridTemplateRows: "auto 1fr auto", gap: 12, minWidth: 0 }}>
         {/* Top controls */}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -138,7 +185,7 @@ export default function Reservation() {
             background: "#f8fafc"
           }}
         >
-          {/* Grid çizgileri */}
+          {/* Grid lines */}
           <div
             style={{
               position: "absolute",
@@ -149,7 +196,7 @@ export default function Reservation() {
               backgroundSize: "24px 24px",
             }}
           >
-            {/* Masa kartları */}
+            {/* Desk cards */}
             {filtered.map(desk => {
               const status = deskStatus.get(desk.id) ?? "available";
               const isSelected = selectedDesk === desk.id;
@@ -182,11 +229,11 @@ export default function Reservation() {
           </div>
         </div>
 
-        {/* Timeline (basit) */}
+        {/* Timeline (simple, single row) */}
         <Timeline start="07:00" end="18:00" bookings={BOOKINGS} selectedDesk={selectedDesk} />
       </div>
 
-      {/* Sağ panel */}
+      {/* Right panel */}
       <aside
         style={{
           border: "1px solid #e5e7eb",
@@ -210,7 +257,7 @@ export default function Reservation() {
           ))}
         </div>
 
-        {/* Seçili masa */}
+        {/* Selected desk card */}
         {selected ? (
           <div
             style={{
@@ -235,30 +282,31 @@ export default function Reservation() {
                 fontWeight: 600,
                 cursor: "pointer"
               }}
-              onClick={() => alert(`(demo) ${selected.label} reserved from ${start} to ${end}`)}
+              onClick={handleReserve}
+              disabled={!selected}
             >
               Reserve {start} – {end}
             </button>
           </div>
         ) : (
-          <em>Soldaki plandan bir masa seç.</em>
+          <em>Pick a desk from the plan on the left.</em>
         )}
       </aside>
     </div>
   );
 }
 
-// ==== Timeline component (basit tek satır) ====
+// ==== Timeline component (simple single bar) ====
 function Timeline({
   start, end, bookings, selectedDesk
 }: { start: string; end: string; bookings: Booking[]; selectedDesk: string | null; }) {
   const s = toMinutes(start), e = toMinutes(end);
   const segments: { leftPct: number; widthPct: number; type: "booked" | "free"; byMe?: boolean; byRequest?: boolean }[] = [];
 
-  // Seçili masa için çiz, yoksa genel şerit
+  // Draw for the selected desk; otherwise draw general bar
   const relevant = selectedDesk ? bookings.filter(b => b.deskId === selectedDesk) : bookings;
 
-  // booked blokları
+  // Booked blocks
   relevant.forEach(b => {
     const b1 = Math.max(s, toMinutes(b.start));
     const b2 = Math.min(e, toMinutes(b.end));
@@ -269,14 +317,12 @@ function Timeline({
     }
   });
 
-  // Basit: booked dışındaki alanı “free” tek blok kabul ediyoruz (MVP)
-  // (İleride gerçek “free” segmentleri hesaplayıp çoklu blok yapabiliriz.)
-
+  // Simple: we treat the rest as a single "free" background (MVP)
   return (
     <div style={{ display: "grid", gap: 8 }}>
       <div style={{ fontSize: 12, color: "#6b7280" }}>Capacity</div>
       <div style={{ position: "relative", height: 20, background: "#eef2ff", borderRadius: 8, overflow: "hidden" }}>
-        {/* booked blokları */}
+        {/* booked blocks */}
         {segments.map((seg, i) => {
           const color = seg.byMe
             ? LEGEND.byMe
@@ -293,7 +339,7 @@ function Timeline({
             }} />
           );
         })}
-        {/* Basit “free” overlay */}
+        {/* subtle inset border */}
         <div style={{ position: "absolute", inset: 0, boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)" }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6b7280" }}>
