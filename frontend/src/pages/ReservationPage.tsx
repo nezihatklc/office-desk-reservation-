@@ -4,16 +4,9 @@ import type { DeskStatus, LegendKey } from "../components/FloorPlan";
 
 <header className="app-header">
   <nav className="app-nav">
-    <div className="app-nav-left">
-      <img src="/logo.svg" alt="DFDS" className="logo" />
-      <a href="/floor" className="link">Floor</a>
-      <a href="/reservations" className="link">My Reservations</a>
-    </div>
-    <div className="app-nav-right">
-      <button className="btn-ghost">🔍</button>
-      <button className="btn-ghost">👤</button>
-      <button className="btn-ghost">⚙️</button>
-    </div>
+    <img src="/logo.svg" alt="DFDS" className="logo" />
+    <a href="/floor" className="link">Floor</a>
+    <a href="/reservations" className="link">My Reservations</a>
   </nav>
 </header>
 
