@@ -33,13 +33,15 @@ builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// ✅ Enable Swagger UI in Development
+// Enable Swagger UI in Development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+
+app.UseMiddleware<ExceptionMiddleware>();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();

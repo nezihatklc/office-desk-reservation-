@@ -1,59 +1,84 @@
+using System.Text.RegularExpressions;
 using backend.DTOs;
 using backend.Models;
 using backend.Repositories;
 
-namespace backend.Services
+public class UserService
 {
-    public class UserService
+    
+    private readonly IUserRepository _userRepository;
+
+    
+    public UserService(IUserRepository userRepository)
     {
-        private readonly IUserRepository _userRepository;
+        _userRepository = userRepository;
+    }
 
-        public UserService(IUserRepository userRepository)
+    public UserResponse Register(RegisterRequest request)
+    {
+        //check if req fields are done
+        if (string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.Password))
+            throw new ArgumentException("Email and Password are required.");
+
+        //format
+        if (!request.Email.Contains("@"))
+            throw new ArgumentException("Invalid email format.");
+
+        //password rule
+        if (request.Password.Length < 12)
+            throw new ArgumentException("Password must be at least 12 characters long.");
+        if (!Regex.IsMatch(request.Password, @"[!@#$%^&*(),.?""{}|<>]"))
+            throw new ArgumentException("Password must contain at least one special character.");
+        if (!Regex.IsMatch(request.Password, @"\d"))
+            throw new ArgumentException("Password must contain at least one digit.");
+        if (!Regex.IsMatch(request.Password, @"[A-Z]"))
+            throw new ArgumentException("Password must contain at least one uppercase letter.");
+
+        //what if email aşredyexists--reject 
+        var existingUser = _userRepository
+            .GetAll()
+            .FirstOrDefault(u => u.Email == request.Email);
+        if (existingUser != null)
+            throw new InvalidOperationException("User with this email already exists.");
+
+        //hash password
+        var user = new User
         {
-            _userRepository = userRepository;
-        }
+            FirstName = request.FirstName,
+            LastName = request.LastName,
+            Email = request.Email,
+            Password = request.Password, // ⚠ currently stored in plaintext
+            CreatedBy = request.CreatedBy
+        };
 
-        // ✅ Register
-        public UserResponse Register(RegisterRequest request)
+        _userRepository.Add(user);
+
+        return new UserResponse
         {
-            var user = new User
-            {
-                FirstName = request.FirstName,
-                LastName = request.LastName,
-                Email = request.Email,
-                Password = request.Password, // ⚠️ In production, hash before saving
-                Created = DateTime.UtcNow,
-                CreatedBy = request.CreatedBy
-            };
+            UserId = user.UserId,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
+            Created = user.Created
+        };
+    }
 
-            _userRepository.Add(user);
+    public UserResponse? Login(string email, string password)
+    {
+        var user = _userRepository.GetAll().FirstOrDefault(u => u.Email == email);
 
-            return new UserResponse
-            {
-                UserId = user.UserId,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Email = user.Email,
-                Created = user.Created
-            };
-        }
+        // In real app: verify hashed password
+        if (user == null || user.Password != password)
+            return null;
 
-        // ✅ Login
-        public UserResponse? Login(string email, string password)
+        return new UserResponse
         {
-            var user = _userRepository.GetAll()
-                .FirstOrDefault(u => u.Email == email && u.Password == password);
-
-            if (user == null) return null;
-
-            return new UserResponse
-            {
-                UserId = user.UserId,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Email = user.Email,
-                Created = user.Created
-            };
-        }
+            UserId = user.UserId,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
+            Created = user.Created
+        };
     }
 }
