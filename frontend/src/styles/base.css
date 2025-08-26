@@ -1,0 +1,37 @@
+/* ===== Base / Reset / Typography ===== */
+
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  background: linear-gradient(180deg, #013554 0%, #002B45 60%, #001C2D 100%);
+  color: var(--text-on-dark);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Links */
+a { color: var(--brand-300); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Headings and paragraphs */
+h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+h2 { font-size: 1.375rem; margin: 0 0 0.5rem; }
+p  { margin: 0.5rem 0; color: var(--text-on-dark); }
+
+/* Utility classes */
+.container { max-width: var(--container); margin: 0 auto; padding: 24px; }
+.muted { color: var(--muted); }
+.hidden { display: none !important; }
+.center { display:flex; align-items:center; justify-content:center; }
+.row { display:flex; gap: var(--gap); align-items:center; }
+.col { display:flex; flex-direction:column; gap: var(--gap); }
+
+/* Accessibility - focus outline */
+:focus-visible {
+  outline: 2px solid var(--brand-300);
+  outline-offset: 2px;
+}

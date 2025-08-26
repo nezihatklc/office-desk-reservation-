@@ -1,35 +1,33 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Routes, Route, Navigate } from "react-router-dom";
+import Header from "./components/Header";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Profile from "./pages/Profile";
+import Terms from "./pages/Terms";
+import ReservationPage from "./pages/ReservationPage";
+import ProtectedRoute from "./auth/ProtectedRoute";
+// import FloorOld from "./pages/Floor"; // istersen tut
 
-function App() {
-  const [count, setCount] = useState(0)
-
+export default function App() {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <main>
+      <Header />
+      <div className="page">
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/terms" element={<Terms />} />
 
-export default App
+          <Route element={<ProtectedRoute />}>
+            <Route path="/floor" element={<ReservationPage />} />
+            {/* <Route path="/floor-old" element={<FloorOld />} /> */}
+            <Route path="/me" element={<Profile />} />
+          </Route>
+
+          <Route path="*" element={<div>Not Found</div>} />
+        </Routes>
+      </div>
+    </main>
+  );
+}
