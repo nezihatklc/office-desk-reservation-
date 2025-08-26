@@ -17,7 +17,7 @@ namespace backend.Repositories
             await _context.Workspaces.ToListAsync();
 
         public async Task<Workspace?> GetByIdAsync(int id) =>
-            await _context.Workspaces.FindAsync(id);
+            await _context.Workspaces.FirstOrDefaultAsync(w => w.WorkspaceId == id);
 
         public async Task AddAsync(Workspace workspace)
         {

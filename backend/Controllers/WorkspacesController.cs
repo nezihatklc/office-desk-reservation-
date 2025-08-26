@@ -1,3 +1,4 @@
+using backend.DTOs;
 using backend.Models;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -15,37 +16,75 @@ namespace backend.Controllers
             _workspaceService = workspaceService;
         }
 
+        // GET ALL
         [HttpGet]
-        public async Task<IActionResult> GetAll() =>
-            Ok(await _workspaceService.GetAllAsync());
+        public async Task<IActionResult> GetAll()
+        {
+            var workspaces = await _workspaceService.GetAllAsync();
 
+            var result = workspaces.Select(w => new WorkspaceResponseDto
+            {
+                WorkspaceId = w.WorkspaceId,
+                WorkspaceName = w.WorkspaceName,
+                FloorNumber = w.FloorNumber,
+                DeskCode = w.DeskCode,
+                Created = w.Created
+            });
+
+            return Ok(result);
+        }
+
+        // GET BY ID
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var workspace = await _workspaceService.GetByIdAsync(id);
-            return workspace == null ? NotFound() : Ok(workspace);
+            if (workspace == null) return NotFound();
+
+            return Ok(new WorkspaceResponseDto
+            {
+                WorkspaceId = workspace.WorkspaceId,
+                WorkspaceName = workspace.WorkspaceName,
+                FloorNumber = workspace.FloorNumber,
+                DeskCode = workspace.DeskCode,
+                Created = workspace.Created
+            });
         }
 
+        // CREATE
         [HttpPost]
-        public async Task<IActionResult> Create(Workspace workspace)
+        public async Task<IActionResult> Create(WorkspaceCreateDto dto)
         {
-            await _workspaceService.AddAsync(workspace);
-            return CreatedAtAction(nameof(GetById), new { id = workspace.WorkspaceId }, workspace);
-        }
+            try
+            {
+                var workspace = new Workspace
+                {
+                    WorkspaceName = dto.WorkspaceName,
+                    FloorNumber = dto.FloorNumber,
+                    DeskCode = dto.DeskCode,
+                    Created = DateTime.UtcNow
+                };
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Workspace workspace)
-        {
-            if (id != workspace.WorkspaceId) return BadRequest();
-            await _workspaceService.UpdateAsync(workspace);
-            return NoContent();
-        }
+                await _workspaceService.AddAsync(workspace);
 
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
-        {
-            await _workspaceService.DeleteAsync(id);
-            return NoContent();
-        }
+                return CreatedAtAction(nameof(GetById), new { id = workspace.WorkspaceId }, new WorkspaceResponseDto
+                {
+                    WorkspaceId = workspace.WorkspaceId,
+                    WorkspaceName = workspace.WorkspaceName,
+                    FloorNumber = workspace.FloorNumber,
+                    DeskCode = workspace.DeskCode,
+                    Created = workspace.Created
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = ex.Message,
+                    inner = ex.InnerException?.Message
+                });
+            }
+        } 
+        
     }
 }
