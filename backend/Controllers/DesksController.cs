@@ -1,5 +1,7 @@
+using backend.DTOs;
 using backend.Models;
 using backend.Services;
+using backend.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace backend.Controllers
@@ -15,35 +17,92 @@ namespace backend.Controllers
             _deskService = deskService;
         }
 
+        // GET: api/Desks
         [HttpGet]
-        public async Task<IActionResult> GetAll() =>
-            Ok(await _deskService.GetAllAsync());
+        public async Task<ActionResult<IEnumerable<DeskResponse>>> GetAll()
+        {
+            var desks = await _deskService.GetAllAsync();
 
+            return Ok(desks.Select(d => new DeskResponse
+            {
+                DeskId = d.DeskId,
+                WorkspaceId = d.WorkspaceId,
+                DeskCode = d.DeskCode,
+                IsActive = d.Isactive
+            }));
+        }
+
+        // GET: api/Desks/{id}
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<ActionResult<DeskResponse>> GetById(int id)
         {
             var desk = await _deskService.GetByIdAsync(id);
-            return desk == null ? NotFound() : Ok(desk);
+            if (desk == null)
+                throw new NotFoundException($"Desk with ID {id} not found.");
+
+            return Ok(new DeskResponse
+            {
+                DeskId = desk.DeskId,
+                WorkspaceId = desk.WorkspaceId,
+                DeskCode = desk.DeskCode,
+                IsActive = desk.Isactive
+            });
         }
 
+        // POST: api/Desks
         [HttpPost]
-        public async Task<IActionResult> Create(Desk desk)
+        public async Task<ActionResult<DeskResponse>> Create([FromBody] DeskCreateRequest request)
         {
+            
+            if (string.IsNullOrWhiteSpace(request.DeskCode))
+                throw new BadRequestException("DeskCode is required.");
+
+            var desk = new Desk
+            {
+                WorkspaceId = request.WorkspaceId,
+                DeskCode = request.DeskCode,
+                Isactive = request.IsActive,
+                Created = DateTime.UtcNow,
+                CreatedBy = null
+            };
+
             await _deskService.AddAsync(desk);
-            return CreatedAtAction(nameof(GetById), new { id = desk.DeskId }, desk);
+
+            return CreatedAtAction(nameof(GetById), new { id = desk.DeskId }, new DeskResponse
+            {
+                DeskId = desk.DeskId,
+                WorkspaceId = desk.WorkspaceId,
+                DeskCode = desk.DeskCode,
+                IsActive = desk.Isactive
+            });
         }
 
+        // PUT: api/Desks/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Desk desk)
+        public async Task<ActionResult> Update(int id, [FromBody] DeskUpdateRequest request)
         {
-            if (id != desk.DeskId) return BadRequest();
+            if (id != request.DeskId)
+                throw new BadRequestException("ID in URL and body do not match.");
+
+            var desk = await _deskService.GetByIdAsync(id);
+            if (desk == null)
+                throw new NotFoundException($"Desk with ID {id} not found.");
+
+            desk.DeskCode = request.DeskCode;
+            desk.Isactive = request.IsActive;
+
             await _deskService.UpdateAsync(desk);
             return NoContent();
         }
 
+        // DELETE: api/Desks/{id}
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<ActionResult> Delete(int id)
         {
+            var desk = await _deskService.GetByIdAsync(id);
+            if (desk == null)
+                throw new NotFoundException($"Desk with ID {id} not found.");
+
             await _deskService.DeleteAsync(id);
             return NoContent();
         }

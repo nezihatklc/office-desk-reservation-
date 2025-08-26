@@ -166,3 +166,4 @@
 /Users/akaduy.22/Desktop/office-desk-reservation-/backend/bin/Debug/net9.0/Swashbuckle.AspNetCore.Swagger.dll
 /Users/akaduy.22/Desktop/office-desk-reservation-/backend/bin/Debug/net9.0/Swashbuckle.AspNetCore.SwaggerGen.dll
 /Users/akaduy.22/Desktop/office-desk-reservation-/backend/bin/Debug/net9.0/Swashbuckle.AspNetCore.SwaggerUI.dll
+/Users/akaduy.22/Desktop/office-desk-reservation-/backend/bin/Debug/net9.0/BCrypt.Net-Next.dll

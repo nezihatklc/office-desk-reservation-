@@ -2,18 +2,19 @@ using backend.Data;
 using backend.Repositories;
 using backend.Services;
 using Microsoft.EntityFrameworkCore;
+using backend.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ✅ Swagger / OpenAPI
+//swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ✅ Register DbContext with PostgreSQL
+//register via psql
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// ✅ Register repositories
+//register repos
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IDeskRepository, DeskRepository>();
@@ -21,7 +22,7 @@ builder.Services.AddScoped<IFacilityRepository, FacilityRepository>();
 builder.Services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
-// ✅ Register services
+
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<DeskService>();

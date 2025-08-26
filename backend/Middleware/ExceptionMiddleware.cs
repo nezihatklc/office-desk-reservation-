@@ -1,40 +1,70 @@
 using System.Net;
 using System.Text.Json;
+using backend.Exceptions;
 
-
-//for unhandled exceptions across the app
-public class ExceptionMiddleware
+namespace backend.Middleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ExceptionMiddleware> _logger;
-
-    public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
+    //error handling for the entire app 
+    public class ExceptionMiddleware
     {
-        _next = next;
-        _logger = logger;
-    }
+        private readonly RequestDelegate _next;
+        private readonly ILogger<ExceptionMiddleware> _logger;
 
-    public async Task InvokeAsync(HttpContext context)
-    {
-        try
+        public ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
         {
-            await _next(context);
+            _next = next;
+            _logger = logger;
         }
-        catch (Exception ex)
+
+        public async Task InvokeAsync(HttpContext context)
         {
-            _logger.LogError(ex, "Unhandled exception occurred.");
-            await HandleExceptionAsync(context, ex);
+            try
+            {
+                await _next(context);
+            }
+            catch (Exception ex)
+            {
+                //log exception
+                _logger.LogError(ex, "Unhandled exception occurred.");
+                await HandleExceptionAsync(context, ex);
+            }
         }
-    }
 
-    private static Task HandleExceptionAsync(HttpContext context, Exception ex)
-    {
-        var code = HttpStatusCode.InternalServerError; // 500 if unexpected
-        var result = JsonSerializer.Serialize(new { message = "An unexpected error occurred." });
+        private static async Task HandleExceptionAsync(HttpContext context, Exception ex)
+        {
+            HttpStatusCode code = HttpStatusCode.InternalServerError;
+            string message = "An unexpected error occurred.";
 
-        context.Response.ContentType = "application/json";
-        context.Response.StatusCode = (int)code;
+            //map codes
+            switch (ex)
+            {
+                case NotFoundException notFound:
+                    code = HttpStatusCode.NotFound;
+                    message = notFound.Message;
+                    break;
 
-        return context.Response.WriteAsync(result);
+                case ConflictException conflict:
+                    code = HttpStatusCode.Conflict;
+                    message = conflict.Message;
+                    break;
+
+                case BadRequestException badRequest:
+                    code = HttpStatusCode.BadRequest;
+                    message = badRequest.Message;
+                    break;
+
+                case UnauthorizedException unauthorized:
+                    code = HttpStatusCode.Unauthorized;
+                    message = unauthorized.Message;
+                    break;
+            }
+
+            var result = JsonSerializer.Serialize(new { error = message });
+
+            context.Response.ContentType = "application/json";
+            context.Response.StatusCode = (int)code;
+
+            await context.Response.WriteAsync(result);
+        }
     }
 }
