@@ -9,15 +9,18 @@ namespace backend.Services
         private readonly IBookingRepository _bookingRepository;
         private readonly IDeskRepository _deskRepository;
         private readonly IUserRepository _userRepository;
+        private readonly AuditLogService _auditLogService;
 
         public BookingService(
             IBookingRepository bookingRepository,
             IDeskRepository deskRepository,
-            IUserRepository userRepository)
+            IUserRepository userRepository,
+            AuditLogService auditLogService)   //audit log sevrice
         {
             _bookingRepository = bookingRepository;
             _deskRepository = deskRepository;
             _userRepository = userRepository;
+            _auditLogService = auditLogService;
         }
 
         public Task<List<Booking>> GetAllAsync() => _bookingRepository.GetAllAsync();
@@ -25,24 +28,26 @@ namespace backend.Services
 
         public async Task AddAsync(Booking booking)
         {
-            // Validate Desk
             var desk = await _deskRepository.GetByIdAsync(booking.DeskId);
             if (desk == null)
                 throw new NotFoundException($"Desk {booking.DeskId} not found.");
 
-            // Validate User
             var user = await _userRepository.GetByIdAsync(booking.UserId);
             if (user == null)
                 throw new NotFoundException($"User {booking.UserId} not found.");
 
-            // Validate Overlap
-            var hasOverlap = await _bookingRepository.HasOverlapAsync(
-                booking.DeskId, booking.BookingStart, booking.BookingEnd);
-
-            if (hasOverlap)
+            if (await _bookingRepository.HasOverlapAsync(booking.DeskId, booking.BookingStart, booking.BookingEnd))
                 throw new ConflictException("Desk is already booked for the selected time range.");
 
             await _bookingRepository.AddAsync(booking);
+
+            //call audit log
+            await _auditLogService.AddAsync(new AuditLog
+            {
+                UserId = booking.UserId,
+                Action = $"Created booking {booking.BookingId} for Desk {booking.DeskId}",
+                LogTime = DateTime.UtcNow
+            });
         }
 
         public async Task UpdateAsync(Booking booking)
@@ -52,6 +57,14 @@ namespace backend.Services
                 throw new NotFoundException($"Booking {booking.BookingId} not found.");
 
             await _bookingRepository.UpdateAsync(booking);
+
+            //call audit log
+            await _auditLogService.AddAsync(new AuditLog
+            {
+                UserId = booking.UserId,
+                Action = $"Updated booking {booking.BookingId} (Desk {booking.DeskId})",
+                LogTime = DateTime.UtcNow
+            });
         }
 
         public async Task DeleteAsync(int id)
@@ -61,12 +74,17 @@ namespace backend.Services
                 throw new NotFoundException($"Booking {id} not found.");
 
             await _bookingRepository.DeleteAsync(id);
+
+            //call audit log
+            await _auditLogService.AddAsync(new AuditLog
+            {
+                UserId = existing.UserId,
+                Action = $"Deleted booking {existing.BookingId} (Desk {existing.DeskId})",
+                LogTime = DateTime.UtcNow
+            });
         }
 
-        public Task<List<Booking>> GetByUserIdAsync(int userId) =>
-            _bookingRepository.GetByUserIdAsync(userId);
-
-        public Task<List<Booking>> GetByDeskIdAsync(int deskId) =>
-            _bookingRepository.GetByDeskIdAsync(deskId);
+        public Task<List<Booking>> GetByUserIdAsync(int userId) => _bookingRepository.GetByUserIdAsync(userId);
+        public Task<List<Booking>> GetByDeskIdAsync(int deskId) => _bookingRepository.GetByDeskIdAsync(deskId);
     }
 }
