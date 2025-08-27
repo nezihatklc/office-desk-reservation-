@@ -1,5 +1,7 @@
+using backend.DTOs;
 using backend.Models;
 using backend.Services;
+using backend.Exceptions;
 using Microsoft.AspNetCore.Mvc;
 
 namespace backend.Controllers
@@ -15,34 +17,79 @@ namespace backend.Controllers
             _facilityService = facilityService;
         }
 
+        // GET: api/Facilities
         [HttpGet]
-        public async Task<IActionResult> GetAll() =>
-            Ok(await _facilityService.GetAllAsync());
+        public async Task<ActionResult<IEnumerable<FacilityResponse>>> GetAll()
+        {
+            var facilities = await _facilityService.GetAllAsync();
+            return Ok(facilities.Select(f => new FacilityResponse
+            {
+                FacilityId = f.FacilityId,
+                Name = f.Name,
+                Description = f.Description
+            }));
+        }
 
+        // GET: api/Facilities/{id}
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<ActionResult<FacilityResponse>> GetById(int id)
         {
             var facility = await _facilityService.GetByIdAsync(id);
-            return facility == null ? NotFound() : Ok(facility);
+            if (facility == null)
+                throw new NotFoundException($"Facility with ID {id} not found.");
+
+            return Ok(new FacilityResponse
+            {
+                FacilityId = facility.FacilityId,
+                Name = facility.Name,
+                Description = facility.Description
+            });
         }
 
+        // POST: api/Facilities
         [HttpPost]
-        public async Task<IActionResult> Create(Facility facility)
+        public async Task<ActionResult<FacilityResponse>> Create([FromBody] FacilityCreateRequest request)
         {
+            if (string.IsNullOrWhiteSpace(request.Name))
+                throw new BadRequestException("Facility name is required.");
+
+            var facility = new Facility
+            {
+                Name = request.Name,
+                Description = request.Description
+            };
+
             await _facilityService.AddAsync(facility);
-            return CreatedAtAction(nameof(GetById), new { id = facility.FacilityId }, facility);
+
+            return CreatedAtAction(nameof(GetById), new { id = facility.FacilityId }, new FacilityResponse
+            {
+                FacilityId = facility.FacilityId,
+                Name = facility.Name,
+                Description = facility.Description
+            });
         }
 
+        // PUT: api/Facilities/{id}
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Facility facility)
+        public async Task<ActionResult> Update(int id, [FromBody] FacilityUpdateRequest request)
         {
-            if (id != facility.FacilityId) return BadRequest();
+            if (id != request.FacilityId)
+                throw new BadRequestException("ID in URL and body do not match.");
+
+            var facility = new Facility
+            {
+                FacilityId = request.FacilityId,
+                Name = request.Name,
+                Description = request.Description
+            };
+
             await _facilityService.UpdateAsync(facility);
             return NoContent();
         }
 
+        // DELETE: api/Facilities/{id}
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<ActionResult> Delete(int id)
         {
             await _facilityService.DeleteAsync(id);
             return NoContent();

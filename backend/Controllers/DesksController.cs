@@ -28,7 +28,7 @@ namespace backend.Controllers
                 DeskId = d.DeskId,
                 WorkspaceId = d.WorkspaceId,
                 DeskCode = d.DeskCode,
-                IsActive = d.Isactive
+                IsActive = d.IsActive
             }));
         }
 
@@ -45,7 +45,7 @@ namespace backend.Controllers
                 DeskId = desk.DeskId,
                 WorkspaceId = desk.WorkspaceId,
                 DeskCode = desk.DeskCode,
-                IsActive = desk.Isactive
+                IsActive = desk.IsActive
             });
         }
 
@@ -61,7 +61,7 @@ namespace backend.Controllers
             {
                 WorkspaceId = request.WorkspaceId,
                 DeskCode = request.DeskCode,
-                Isactive = request.IsActive,
+                IsActive = request.IsActive,
                 Created = DateTime.UtcNow,
                 CreatedBy = null
             };
@@ -73,7 +73,7 @@ namespace backend.Controllers
                 DeskId = desk.DeskId,
                 WorkspaceId = desk.WorkspaceId,
                 DeskCode = desk.DeskCode,
-                IsActive = desk.Isactive
+                IsActive = desk.IsActive
             });
         }
 
@@ -89,7 +89,7 @@ namespace backend.Controllers
                 throw new NotFoundException($"Desk with ID {id} not found.");
 
             desk.DeskCode = request.DeskCode;
-            desk.Isactive = request.IsActive;
+            desk.IsActive = request.IsActive;
 
             await _deskService.UpdateAsync(desk);
             return NoContent();

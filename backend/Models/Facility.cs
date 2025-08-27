@@ -1,15 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.ComponentModel.DataAnnotations;
 
-namespace backend.Models;
-
-public partial class Facility
+namespace backend.Models
 {
-    public int FacilityId { get; set; }
+    public class Facility
+    {
+        [Key]
+        public int FacilityId { get; set; }
 
-    public string Name { get; set; } = null!;
+        [Required]
+        [StringLength(100)]
+        public string Name { get; set; } = null!;
 
-    public string? Description { get; set; }
+        [StringLength(250)]
+        public string? Description { get; set; }
 
-    public virtual ICollection<Desk> Desks { get; set; } = new List<Desk>();
+        // 🔑 Navigation: many-to-many via DeskFacilities
+        public virtual ICollection<DeskFacility> DeskFacilities { get; set; } = new List<DeskFacility>();
+    }
 }

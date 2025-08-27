@@ -3,171 +3,178 @@ using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using backend.Models;
 
-namespace backend.Data;
-
-public partial class AppDbContext : DbContext
+namespace backend.Data
 {
-    public AppDbContext()
+    public partial class AppDbContext : DbContext
     {
-    }
+        public AppDbContext()
+        {
+        }
 
-    public AppDbContext(DbContextOptions<AppDbContext> options)
-        : base(options)
-    {
-    }
+        public AppDbContext(DbContextOptions<AppDbContext> options)
+            : base(options)
+        {
+        }
 
-    public virtual DbSet<AuditLog> AuditLogs { get; set; }
-    public virtual DbSet<Booking> Bookings { get; set; }
-    public virtual DbSet<Desk> Desks { get; set; }
-    public virtual DbSet<Facility> Facilities { get; set; }
-    public virtual DbSet<User> Users { get; set; }
-    public virtual DbSet<Workspace> Workspaces { get; set; }
+        public virtual DbSet<AuditLog> AuditLogs { get; set; }
+        public virtual DbSet<Booking> Bookings { get; set; }
+        public virtual DbSet<Desk> Desks { get; set; }
+        public virtual DbSet<Facility> Facilities { get; set; }
+        public virtual DbSet<User> Users { get; set; }
+        public virtual DbSet<Workspace> Workspaces { get; set; }
+        public virtual DbSet<DeskFacility> DeskFacilities { get; set; }   // ✅ join entity
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning Move your connection string to appsettings.json for safety
-        => optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=Andromeda;Username=postgres;Password=yourpassword");
+            => optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=Andromeda;Username=postgres;Password=yourpassword");
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-        modelBuilder
-            .HasPostgresExtension("btree_gist")
-            .HasPostgresExtension("citext");
-
-        // === AUDIT LOGS ===
-        modelBuilder.Entity<AuditLog>(entity =>
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            entity.HasKey(e => e.LogId).HasName("audit_logs_pkey");
-            entity.ToTable("audit_logs");
+            modelBuilder
+                .HasPostgresExtension("btree_gist")
+                .HasPostgresExtension("citext");
 
-            entity.Property(e => e.LogId).UseIdentityAlwaysColumn().HasColumnName("log_id");
-            entity.Property(e => e.Action).HasMaxLength(100).HasColumnName("action");
-            entity.Property(e => e.LogTime).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("log_time");
-            entity.Property(e => e.UserId).HasColumnName("user_id");
+            // === AUDIT LOGS ===
+            modelBuilder.Entity<AuditLog>(entity =>
+            {
+                entity.HasKey(e => e.LogId).HasName("audit_logs_pkey");
+                entity.ToTable("audit_logs");
 
-            entity.HasOne(d => d.User).WithMany(p => p.AuditLogs)
-                .HasForeignKey(d => d.UserId)
-                .HasConstraintName("audit_logs_user_id_fkey");
-        });
+                entity.Property(e => e.LogId).UseIdentityAlwaysColumn().HasColumnName("log_id");
+                entity.Property(e => e.Action).HasMaxLength(100).HasColumnName("action");
+                entity.Property(e => e.LogTime).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("log_time");
+                entity.Property(e => e.UserId).HasColumnName("user_id");
 
-        // === BOOKINGS ===
-        modelBuilder.Entity<Booking>(entity =>
-        {
-            entity.HasKey(e => e.BookingId).HasName("bookings_pkey");
-            entity.ToTable("bookings");
+                entity.HasOne(d => d.User).WithMany(p => p.AuditLogs)
+                    .HasForeignKey(d => d.UserId)
+                    .HasConstraintName("audit_logs_user_id_fkey");
+            });
 
-            entity.Property(e => e.BookingId).UseIdentityAlwaysColumn().HasColumnName("booking_id");
-            entity.Property(e => e.BookingEnd).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '18:00:00'::interval)").HasColumnName("booking_end");
-            entity.Property(e => e.BookingStart).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '09:00:00'::interval)").HasColumnName("booking_start");
-            entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
-            entity.Property(e => e.DeskId).HasColumnName("desk_id");
-            entity.Property(e => e.Status).HasMaxLength(50).HasColumnName("status");
-            entity.Property(e => e.UserId).HasColumnName("user_id");
+            // === BOOKINGS ===
+            modelBuilder.Entity<Booking>(entity =>
+            {
+                entity.HasKey(e => e.BookingId).HasName("bookings_pkey");
+                entity.ToTable("bookings");
 
-            entity.HasOne(d => d.Desk).WithMany(p => p.Bookings)
-                .HasForeignKey(d => d.DeskId)
-                .HasConstraintName("bookings_desk_id_fkey");
+                entity.Property(e => e.BookingId).UseIdentityAlwaysColumn().HasColumnName("booking_id");
+                entity.Property(e => e.BookingEnd).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '18:00:00'::interval)").HasColumnName("booking_end");
+                entity.Property(e => e.BookingStart).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '09:00:00'::interval)").HasColumnName("booking_start");
+                entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
+                entity.Property(e => e.DeskId).HasColumnName("desk_id");
+                entity.Property(e => e.Status).HasMaxLength(50).HasColumnName("status");
+                entity.Property(e => e.UserId).HasColumnName("user_id");
 
-            entity.HasOne(d => d.User).WithMany(p => p.Bookings)
-                .HasForeignKey(d => d.UserId)
-                .HasConstraintName("bookings_user_id_fkey");
-        });
+                entity.HasOne(d => d.Desk).WithMany(p => p.Bookings)
+                    .HasForeignKey(d => d.DeskId)
+                    .HasConstraintName("bookings_desk_id_fkey");
 
-        // === DESKS ===
-        modelBuilder.Entity<Desk>(entity =>
-        {
-            entity.HasKey(e => e.DeskId).HasName("desks_pkey");
-            entity.ToTable("desks");
+                entity.HasOne(d => d.User).WithMany(p => p.Bookings)
+                    .HasForeignKey(d => d.UserId)
+                    .HasConstraintName("bookings_user_id_fkey");
+            });
 
-            entity.HasIndex(e => e.DeskCode, "desks_desk_code_key").IsUnique();
+            modelBuilder.Entity<Desk>(entity =>
+            {
+                entity.HasKey(e => e.DeskId).HasName("desks_pkey");
+                entity.ToTable("desks");
 
-            entity.Property(e => e.DeskId).UseIdentityAlwaysColumn().HasColumnName("desk_id");
-            entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
-            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
-            entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
-            entity.Property(e => e.Isactive).HasColumnName("isactive");
-            entity.Property(e => e.WorkspaceId).HasColumnName("workspace_id");
+                entity.HasIndex(e => e.DeskCode, "desks_desk_code_key").IsUnique();
 
-            entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.Desks)
-                .HasForeignKey(d => d.CreatedBy)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("desks_created_by_fkey");
+                entity.Property(e => e.DeskId).UseIdentityAlwaysColumn().HasColumnName("desk_id");
+                entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
+                entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+                entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
+                entity.Property(e => e.IsActive).HasColumnName("isActive");
+                entity.Property(e => e.WorkspaceId).HasColumnName("workspace_id");
 
-            entity.HasOne(d => d.Workspace).WithMany(p => p.Desks)
-                .HasForeignKey(d => d.WorkspaceId)
-                .HasConstraintName("desks_workspace_id_fkey");
+                entity.HasOne(d => d.CreatedByNavigation)
+                    .WithMany(p => p.Desks)
+                    .HasForeignKey(d => d.CreatedBy)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName("desks_created_by_fkey");
 
-            entity.HasMany(d => d.Facilities).WithMany(p => p.Desks)
-                .UsingEntity<Dictionary<string, object>>(
-                    "DeskFacility",
-                    r => r.HasOne<Facility>().WithMany()
-                        .HasForeignKey("FacilityId")
-                        .HasConstraintName("desk_facilities_facility_id_fkey"),
-                    l => l.HasOne<Desk>().WithMany()
-                        .HasForeignKey("DeskId")
-                        .HasConstraintName("desk_facilities_desk_id_fkey"),
-                    j =>
-                    {
-                        j.HasKey("DeskId", "FacilityId").HasName("desk_facilities_pkey");
-                        j.ToTable("desk_facilities");
-                        j.IndexerProperty<int>("DeskId").HasColumnName("desk_id");
-                        j.IndexerProperty<int>("FacilityId").HasColumnName("facility_id");
-                    });
-        });
+                entity.HasOne(d => d.Workspace)
+                    .WithMany(p => p.Desks)
+                    .HasForeignKey(d => d.WorkspaceId)
+                    .HasConstraintName("desks_workspace_id_fkey");
+            });
 
-        // === FACILITIES ===
-        modelBuilder.Entity<Facility>(entity =>
-        {
-            entity.HasKey(e => e.FacilityId).HasName("facilities_pkey");
-            entity.ToTable("facilities");
 
-            entity.HasIndex(e => e.Name, "facilities_name_key").IsUnique();
+            // === FACILITIES ===
+            modelBuilder.Entity<Facility>(entity =>
+            {
+                entity.HasKey(e => e.FacilityId).HasName("facilities_pkey");
+                entity.ToTable("facilities");
 
-            entity.Property(e => e.FacilityId).UseIdentityAlwaysColumn().HasColumnName("facility_id");
-            entity.Property(e => e.Description).HasColumnName("description");
-            entity.Property(e => e.Name).HasMaxLength(100).HasColumnName("name");
-        });
+                entity.HasIndex(e => e.Name, "facilities_name_key").IsUnique();
 
-        // === USERS ===
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.HasKey(e => e.UserId).HasName("users_pkey");
-            entity.ToTable("users");
+                entity.Property(e => e.FacilityId).UseIdentityAlwaysColumn().HasColumnName("facility_id");
+                entity.Property(e => e.Description).HasColumnName("description");
+                entity.Property(e => e.Name).HasMaxLength(100).HasColumnName("name");
+            });
 
-            entity.HasIndex(e => e.Email, "users_email_key").IsUnique();
+            // === DESK_FACILITIES (join table) ===
+            modelBuilder.Entity<DeskFacility>(entity =>
+            {
+                entity.HasKey(df => new { df.DeskId, df.FacilityId }).HasName("desk_facilities_pkey");
+                entity.ToTable("desk_facilities");
 
-            entity.Property(e => e.UserId)
-                .UseIdentityAlwaysColumn()    // <-- instead of ValueGeneratedNever
-                .HasColumnName("user_id");
-            entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
-            entity.Property(e => e.CreatedBy).HasColumnName("created_by");
-            entity.Property(e => e.Email).HasColumnType("citext").HasColumnName("email");
-            entity.Property(e => e.FirstName).HasMaxLength(50).HasColumnName("first_name");
-            entity.Property(e => e.LastName).HasMaxLength(50).HasColumnName("last_name");
-            entity.Property(e => e.Password).HasMaxLength(100).HasColumnName("password");
+                entity.Property(df => df.DeskId).HasColumnName("desk_id");
+                entity.Property(df => df.FacilityId).HasColumnName("facility_id");
 
-            entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.InverseCreatedByNavigation)
-                .HasForeignKey(d => d.CreatedBy)
-                .OnDelete(DeleteBehavior.SetNull)
-                .HasConstraintName("users_created_by_fkey");
-        });
+                entity.HasOne(df => df.Desk)
+                    .WithMany(d => d.DeskFacilities)
+                    .HasForeignKey(df => df.DeskId)
+                    .HasConstraintName("desk_facilities_desk_id_fkey");
 
-        // === WORKSPACES ===
-        modelBuilder.Entity<Workspace>(entity =>
-        {
-            entity.HasKey(e => e.WorkspaceId).HasName("workspaces_pkey");
-            entity.ToTable("workspaces");
+                entity.HasOne(df => df.Facility)
+                    .WithMany(f => f.DeskFacilities)
+                    .HasForeignKey(df => df.FacilityId)
+                    .HasConstraintName("desk_facilities_facility_id_fkey");
+            });
 
-            entity.HasIndex(e => e.DeskCode, "workspaces_desk_code_key").IsUnique();
+            // === USERS ===
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.HasKey(e => e.UserId).HasName("users_pkey");
+                entity.ToTable("users");
 
-            entity.Property(e => e.WorkspaceId).UseIdentityAlwaysColumn().HasColumnName("workspace_id");
-            entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
-            entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
-            entity.Property(e => e.FloorNumber).HasDefaultValueSql("'2nd Floor'::text").HasColumnName("floor_number");
-            entity.Property(e => e.WorkspaceName).HasMaxLength(50).HasColumnName("workspace_name");
-        });
+                entity.HasIndex(e => e.Email, "users_email_key").IsUnique();
 
-        OnModelCreatingPartial(modelBuilder);
+                entity.Property(e => e.UserId)
+                    .UseIdentityAlwaysColumn()
+                    .HasColumnName("user_id");
+                entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
+                entity.Property(e => e.CreatedBy).HasColumnName("created_by");
+                entity.Property(e => e.Email).HasColumnType("citext").HasColumnName("email");
+                entity.Property(e => e.FirstName).HasMaxLength(50).HasColumnName("first_name");
+                entity.Property(e => e.LastName).HasMaxLength(50).HasColumnName("last_name");
+                entity.Property(e => e.Password).HasMaxLength(100).HasColumnName("password");
+
+                entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.InverseCreatedByNavigation)
+                    .HasForeignKey(d => d.CreatedBy)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName("users_created_by_fkey");
+            });
+
+            // === WORKSPACES ===
+            modelBuilder.Entity<Workspace>(entity =>
+            {
+                entity.HasKey(e => e.WorkspaceId).HasName("workspaces_pkey");
+                entity.ToTable("workspaces");
+
+                entity.HasIndex(e => e.DeskCode, "workspaces_desk_code_key").IsUnique();
+
+                entity.Property(e => e.WorkspaceId).UseIdentityAlwaysColumn().HasColumnName("workspace_id");
+                entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
+                entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
+                entity.Property(e => e.FloorNumber).HasDefaultValueSql("'2nd Floor'::text").HasColumnName("floor_number");
+                entity.Property(e => e.WorkspaceName).HasMaxLength(50).HasColumnName("workspace_name");
+            });
+
+            OnModelCreatingPartial(modelBuilder);
+        }
+
+        partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
     }
-
-    partial void OnModelCreatingPartial(ModelBuilder modelBuilder);
 }

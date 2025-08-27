@@ -1,27 +1,33 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace backend.Models;
-
-public partial class Desk
+namespace backend.Models
 {
-    public int DeskId { get; set; }
+    public class Desk
+    {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int DeskId { get; set; }
 
-    public int WorkspaceId { get; set; }
+        [Required]
+        public int WorkspaceId { get; set; }
 
-    public string DeskCode { get; set; } = null!;
+        [Required]
+        [StringLength(20)]
+        public string DeskCode { get; set; } = null!;
 
-    public bool Isactive { get; set; }
+        public bool IsActive { get; set; }
 
-    public DateTime Created { get; set; }
+        public DateTime Created { get; set; } = DateTime.UtcNow;
 
-    public int? CreatedBy { get; set; }
+        public int? CreatedBy { get; set; }
 
-    public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
-
-    public virtual User? CreatedByNavigation { get; set; }
-
-    public virtual Workspace Workspace { get; set; } = null!;
-
-    public virtual ICollection<Facility> Facilities { get; set; } = new List<Facility>();
+        //navigation props
+        
+        public virtual User? CreatedByNavigation { get; set; }
+        public virtual Workspace Workspace { get; set; } = null!;
+    
+        public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
+        public virtual ICollection<DeskFacility> DeskFacilities { get; set; } = new List<DeskFacility>();
+    }
 }
