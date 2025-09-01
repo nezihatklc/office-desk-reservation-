@@ -1,0 +1,134 @@
+/* Header: translucent bar with subtle border & blur */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.25);       
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+.app-header .link {
+  color: rgba(255,255,255,.7);
+  font-weight: 500;
+  font-size: 15px;
+  transition: color .2s ease, border-color .2s ease;
+  padding: 4px 8px;
+  border-bottom: 2px solid transparent;
+}
+.app-header .link:hover {
+  color: #fff;
+  border-bottom-color: var(--colors-secondary-main);
+}
+.app-header .link.active {
+  color: #fff;
+  border-bottom-color: var(--colors-secondary-main);
+  font-weight: 600;
+}
+
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1200px;                      
+  margin: 0 auto;
+  padding: 10px 24px;
+}
+
+.app-nav-left  { display:flex; align-items:center; gap: 16px; }
+.app-nav-right { display:flex; align-items:center; gap: 18px; }
+
+.logo { height: 40px; width: auto; opacity: .98; }
+.logo-invert { filter: brightness(0) invert(1); } 
+
+/* ===== Reservation page layout helpers ===== */
+.top-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.page-grid {
+  display: grid;
+  grid-template-columns: minmax(480px, 1fr) minmax(340px, .68fr); /* ~7:5 oran */
+  gap: 24px;
+}
+@media (max-width: 1200px) {
+  .page-grid { grid-template-columns: 1fr; }
+}
+
+aside.col { gap: 18px !important; }
+
+
+.panel-dark {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+.panel-warn {
+  background: rgba(255,183,0,0.12);
+  border: 1px solid rgba(255,183,0,0.35);
+  color: #ffe6a6;
+  border-radius: var(--radius-lg);
+  padding: 10px 12px;
+}
+
+.legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  margin-top: 8px;
+}
+
+/* Professional glass cards */
+.panel-glass {
+  background: var(--colors-surface-primary);
+  color: var(--colors-text-dark-primary);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  padding: clamp(14px, 2vw, 20px);
+}
+
+/* Larger working area */
+.page-grid { display: grid; grid-template-columns: 5fr 3fr; gap: clamp(16px, 2.4vw, 32px); }
+@media (max-width: 1200px) { .page-grid { grid-template-columns: 1fr; } }
+
+.top-controls .input { border-radius: 999px; padding: 10px 14px; background: var(--colors-surface-primary); border-color: var(--colors-primary-light); color: var(--colors-text-dark-primary); }
+.top-controls .label { color: var(--colors-text-dark-primary); opacity: .9; }
+
+.status-dot {
+  display:inline-block; width:10px; height:10px; border-radius:999px;
+}
+
+
+.panel-glass h2 {
+  color: var(--colors-primary-main);
+  font-size: clamp(1.05rem, 0.9rem + .6vw, 1.25rem);
+  font-weight: 800;
+  letter-spacing: .2px;
+  margin-bottom: .6rem;
+}
+
+.legend-grid .row { align-items: center; gap: 10px; font-weight: 600; }
+.legend-grid .status-dot { width: 12px; height: 12px; border-radius: 999px; box-shadow: 0 0 0 1px rgba(0,0,0,.12) inset; }
+
+.floor-wrap { padding: clamp(10px, 1.6vw, 18px); }
+.floor-wrap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 440px;
+  max-height: min(70vh, 860px); 
+}
+@supports (aspect-ratio: 1 / 1) {
+  .floor-wrap { aspect-ratio: 16 / 9; }   
+}

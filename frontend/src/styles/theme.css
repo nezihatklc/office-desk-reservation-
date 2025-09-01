@@ -1,0 +1,54 @@
+:root {
+  /* ===== DFDS Theme (Hydro UI) ===== */
+  /* Surfaces */
+  --colors-surface-primary:   #FFFFFF;
+  --colors-surface-secondary: #EEF0F1;
+  --colors-surface-tertiary:  #002B45;
+
+  /* Primary */
+  --colors-primary-light: #345370;
+  --colors-primary-main:  #002B45;
+  --colors-primary-dark:  #00001E;
+
+  /* Secondary (accent) */
+  --colors-secondary-light: #BBDD F3; /* istersen #BB DDF3 tek boşluksuz yaz */
+  --colors-secondary-main:  #49A2DF;
+  --colors-secondary-dark:  #1874BC;
+
+  /* Status */
+  --colors-status-info:          #002B45;
+  --colors-status-infomuted:     #BBDD F3;
+  --colors-status-success:       #4CAF50;
+  --colors-status-successmuted:  #B0E0D9; /* ekran görüntüsüne yakın yumuşak yeşil */
+  --colors-status-warning:       #FEB800;
+  --colors-status-warningmuted:  #FFCF80;
+  --colors-status-alert:         #BE1E2D;
+  --colors-status-alertmuted:    #F1A7AE;
+
+  /* Divider */
+  --colors-divider-light: #FFFFF2; /* açık fonda çok hafif çizgi */
+  --colors-divider-dark:  #D4D4D4;
+
+  /* Text */
+  --colors-text-dark-primary:   #4D4E4C;
+  --colors-text-dark-secondary: #4A4C43;
+  --colors-text-light-primary:  #FFFFFF;
+  --colors-text-light-secondary:#FFFFFFB3; /* %70 opak */
+
+  /* Shadow, radii, spacing (mevcudu koruduk) */
+  --ring: rgba(73, 162, 223, 0.55);
+  --shadow: 0 12px 36px rgba(0,0,0,0.25);
+  --radius: 12px;
+  --radius-lg: 16px;
+  --gap: 12px;
+  --container: 1080px;
+
+  /* Backward‑compat for existing files */
+  --brand-900: var(--colors-primary-main);
+  --brand-300: var(--colors-secondary-main);
+  --text-on-dark: #EAF2F8;
+  --text-on-light: #0A0A0A;
+  --muted: #9BB3C4;
+  --surface-1: #0B2233;
+  --surface-2: #11354A;
+}
