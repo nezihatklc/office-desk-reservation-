@@ -1,0 +1,19 @@
+# macOS system files
+.DS_Store
+
+# Rider / JetBrains IDE
+.idea/
+
+# Build folders
+bin/
+obj/
+
+# User-specific settings
+*.user
+*.suo
+
+# Logs
+*.log
+
+# Rider DotSettings
+Folder.DotSettings.user
