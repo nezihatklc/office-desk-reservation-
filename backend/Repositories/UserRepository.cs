@@ -29,7 +29,7 @@ namespace backend.Repositories
             return await _context.Users.FirstOrDefaultAsync(u => u.UserId == id);
         }
 
-        public async Task<User?> GetByEmailAsync(string email)   // ✅ implementation
+        public async Task<User?> GetByEmailAsync(string email)   // implementation
         {
             return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
         }

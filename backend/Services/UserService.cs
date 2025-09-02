@@ -18,8 +18,7 @@ namespace backend.Services
         public async Task<UserResponse> Register(RegisterRequest request)
         {
             // Validate required fields
-            if (string.IsNullOrWhiteSpace(request.Email) ||
-                string.IsNullOrWhiteSpace(request.Password))
+            if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
                 throw new BadRequestException("Email and Password are required.");
 
             // Validate email format

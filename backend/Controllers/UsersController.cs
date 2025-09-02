@@ -1,6 +1,7 @@
 using backend.DTOs;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using backend.Exceptions;
 
 namespace backend.Controllers
 {
@@ -18,14 +19,14 @@ namespace backend.Controllers
         }
 
         [HttpPost("register")]
-        public IActionResult Register([FromBody] RegisterRequest request)
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
             try
             {
-                var user = _userService.Register(request);
+                var user = await _userService.Register(request);
                 return Ok(user);
             }
             catch (InvalidOperationException ex) // duplicate email
@@ -41,21 +42,29 @@ namespace backend.Controllers
         }
 
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginRequest request)
+        public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var user = _userService.Login(request.Email, request.Password);
+            try
+            {
+                var user = await _userService.Login(request.Email, request.Password);
 
-            if (user == null)
+                return Ok(user);
+            }
+            catch (UnauthorizedException ex)
             {
                 _logger.LogWarning("Failed login attempt for email: {Email}", request.Email);
-                return Unauthorized(new { message = "Invalid email or password" });
+                return Unauthorized(new { message = ex.Message });
             }
-
-            return Ok(user);
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error during login for {Email}", request.Email);
+                return StatusCode(500, new { message = "An unexpected error occurred." });
+            }
         }
+
     }
     
 }

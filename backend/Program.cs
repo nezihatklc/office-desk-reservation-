@@ -22,7 +22,6 @@ builder.Services.AddScoped<IFacilityRepository, FacilityRepository>();
 builder.Services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
 
-
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<DeskService>();
@@ -31,6 +30,17 @@ builder.Services.AddScoped<WorkspaceService>();
 builder.Services.AddScoped<AuditLogService>();
 
 builder.Services.AddControllers();
+
+// 🔹 Add CORS policy here
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173", "https://localhost:5173") // Vite frontend
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
@@ -41,9 +51,15 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-
 app.UseMiddleware<ExceptionMiddleware>();
+
 app.UseHttpsRedirection();
+
+// 🔹 Enable CORS before authorization
+app.UseCors("AllowFrontend");
+
 app.UseAuthorization();
+
 app.MapControllers();
+
 app.Run();
