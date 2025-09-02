@@ -1,34 +1,30 @@
 // src/pages/Login.tsx
-// Uses global design system classes (no inline styles, no page-scoped CSS).
-// Handles sign-in with AuthContext and redirects on success.
-
-import { FormEvent, useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext";
+import {useState} from "react";
+import type { FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { loginUser } from "../lib/api"; //import from API
 import logo from "../assets/dfds-logo.png";
 
 export default function Login() {
-  const { user, signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
   const nav = useNavigate();
-  const loc = useLocation();
-
-  // If already signed in, go to the app
-  useEffect(() => {
-    if (user) nav("/floor", { replace: true });
-  }, [user, nav]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const res = await signIn(email.trim(), pw);
-    if (res) setErr(res);
-    else {
-      // Redirect to where the user came from or default to /floor
-      const from = (loc.state as any)?.from?.pathname || "/floor";
-      nav(from, { replace: true });
+    setErr(null); // clear old error
+
+    try {
+      const user = await loginUser({ email: email.trim(), password: pw });
+      console.log("Login success:", user);
+
+      //redirect to floor page after successful login
+      nav("/floor", { replace: true });
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      setErr(error.message || "Login failed. Please try again.");
     }
   }
 
@@ -36,8 +32,8 @@ export default function Login() {
     <div className="auth-page">
       <div className="card auth-card">
         <img src={logo} alt="Company Logo" className="login-logo" />
-        <br/>
-      
+        <br />
+
         <h2 className="auth-title">Login</h2>
 
         <form className="form" onSubmit={onSubmit} noValidate>
@@ -79,7 +75,7 @@ export default function Login() {
 
         <p className="muted auth-hint">
           Don’t have an account?{" "}
-          <Link className="link" to="/register" state={{ from: loc }}>
+          <Link className="link" to="/register">
             Register here
           </Link>
         </p>

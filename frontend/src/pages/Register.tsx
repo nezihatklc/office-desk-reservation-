@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-
+import { registerUser } from "../lib/api"; 
 // Simple email regex for demo-level validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -34,20 +34,25 @@ export default function Register() {
     confirmValid &&
     accepted;
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!formValid) return;
-
-    const payload = {
-      firstName: firstName.trim(),
-      lastName : lastName.trim(),
-      email    : email.trim(),
-      password,
-    };
-
-    console.log("Register payload", payload);
-    alert("Registration created (demo) — will connect to real API later.");
-  }
+    async function handleSubmit(e: React.FormEvent) {
+      e.preventDefault(); // stops GET /register reload
+      if (!formValid) return;
+    
+      try {
+        const response = await registerUser({
+          firstName,
+          lastName,
+          email,
+          password,
+        });
+        console.log("Backend response:", response);
+        alert("Registration successful!");
+      } catch (err: any) {
+        console.error("Backend error:", err);
+        alert(`Registration failed: ${err.message || "Unknown error"}`);
+      }
+    }
+    
 
   return (
     <div className="auth-page">
@@ -177,9 +182,7 @@ export default function Register() {
           </button>
         </form>
 
-        <p className="auth-hint" style={{marginTop: 10}}>
-          * This form is for demo purposes. It will be connected to a real API later.
-        </p>
+        
       </div>
     </div>
   );
