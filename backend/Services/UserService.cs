@@ -15,6 +15,9 @@ namespace backend.Services
             _userRepository = userRepository;
         }
 
+        // ----------------------------
+        // Register
+        // ----------------------------
         public async Task<UserResponse> Register(RegisterRequest request)
         {
             // Validate required fields
@@ -35,7 +38,7 @@ namespace backend.Services
             if (!Regex.IsMatch(request.Password, @"[A-Z]"))
                 throw new BadRequestException("Password must contain at least one uppercase letter.");
 
-            // Check for unique email
+            // Unique email
             var existingUser = await _userRepository.GetByEmailAsync(request.Email);
             if (existingUser != null)
                 throw new ConflictException("User with this email already exists.");
@@ -65,6 +68,9 @@ namespace backend.Services
             };
         }
 
+        // ----------------------------
+        // Login
+        // ----------------------------
         public async Task<UserResponse> Login(string email, string password)
         {
             var user = await _userRepository.GetByEmailAsync(email);
@@ -75,6 +81,42 @@ namespace backend.Services
             bool validPassword = BCrypt.Net.BCrypt.Verify(password, user.Password);
             if (!validPassword)
                 throw new UnauthorizedException("Invalid email or password.");
+
+            return new UserResponse
+            {
+                UserId = user.UserId,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Created = user.Created
+            };
+        }
+
+        // ----------------------------
+        // NEW: Get by Email (used by UsersController GET /byEmail)
+        // ----------------------------
+        public async Task<UserResponse?> GetByEmail(string email)
+        {
+            var user = await _userRepository.GetByEmailAsync(email);
+            if (user == null) return null;
+
+            return new UserResponse
+            {
+                UserId = user.UserId,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
+                Email = user.Email,
+                Created = user.Created
+            };
+        }
+
+        // ----------------------------
+        // NEW: Get by Id (used by UsersController GET /{id})
+        // ----------------------------
+        public async Task<UserResponse?> GetById(int id)
+        {
+            var user = await _userRepository.GetByIdAsync(id);
+            if (user == null) return null;
 
             return new UserResponse
             {

@@ -28,6 +28,7 @@ namespace backend.Controllers
                 WorkspaceName = w.WorkspaceName,
                 FloorNumber = w.FloorNumber,
                 DeskCode = w.DeskCode,
+                Capacity=w.Capacity,
                 Created = w.Created
             });
 
@@ -47,6 +48,7 @@ namespace backend.Controllers
                 WorkspaceName = workspace.WorkspaceName,
                 FloorNumber = workspace.FloorNumber,
                 DeskCode = workspace.DeskCode,
+                Capacity=workspace.Capacity,
                 Created = workspace.Created
             });
         }
@@ -62,6 +64,7 @@ namespace backend.Controllers
                     WorkspaceName = dto.WorkspaceName,
                     FloorNumber = dto.FloorNumber,
                     DeskCode = dto.DeskCode,
+                    Capacity=dto.Capacity,
                     Created = DateTime.UtcNow
                 };
 
@@ -73,6 +76,7 @@ namespace backend.Controllers
                     WorkspaceName = workspace.WorkspaceName,
                     FloorNumber = workspace.FloorNumber,
                     DeskCode = workspace.DeskCode,
+                    Capacity=workspace.Capacity,
                     Created = workspace.Created
                 });
             }
@@ -81,7 +85,7 @@ namespace backend.Controllers
                 return StatusCode(500, new
                 {
                     message = ex.Message,
-                    inner = ex.InnerException?.Message
+                    nner = ex.InnerException?.Message
                 });
             }
         } 

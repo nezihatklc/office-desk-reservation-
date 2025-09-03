@@ -18,6 +18,9 @@ namespace backend.Controllers
             _logger = logger;
         }
 
+        // --------------------------------------------------------------------
+        // POST /api/Users/register
+        // --------------------------------------------------------------------
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
@@ -41,6 +44,9 @@ namespace backend.Controllers
             }
         }
 
+        // --------------------------------------------------------------------
+        // POST /api/Users/login
+        // --------------------------------------------------------------------
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
@@ -50,7 +56,6 @@ namespace backend.Controllers
             try
             {
                 var user = await _userService.Login(request.Email, request.Password);
-
                 return Ok(user);
             }
             catch (UnauthorizedException ex)
@@ -65,6 +70,55 @@ namespace backend.Controllers
             }
         }
 
+        // --------------------------------------------------------------------
+        // GET /api/Users/byEmail?email={email}
+        // Safe for emails with '@' without route-encoding issues.
+        // Returns 404 if not found.
+        // --------------------------------------------------------------------
+        [HttpGet("byEmail")]
+        public async Task<IActionResult> GetByEmail([FromQuery] string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return BadRequest(new { message = "Email is required." });
+
+            try
+            {
+                var user = await _userService.GetByEmail(email);
+                if (user == null)
+                    return NotFound(new { message = "User not found." });
+
+                return Ok(user); // should be UserResponse from your service
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching user by email: {Email}", email);
+                return StatusCode(500, new { message = "An unexpected error occurred." });
+            }
+        }
+
+        // --------------------------------------------------------------------
+        // (Optional but useful)
+        // GET /api/Users/{id}
+        // --------------------------------------------------------------------
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> GetById([FromRoute] int id)
+        {
+            if (id <= 0)
+                return BadRequest(new { message = "Invalid user id." });
+
+            try
+            {
+                var user = await _userService.GetById(id);
+                if (user == null)
+                    return NotFound(new { message = "User not found." });
+
+                return Ok(user); // should be UserResponse from your service
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching user by id: {Id}", id);
+                return StatusCode(500, new { message = "An unexpected error occurred." });
+            }
+        }
     }
-    
 }

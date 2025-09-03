@@ -57,6 +57,11 @@ namespace backend.Data
                 entity.ToTable("bookings");
 
                 entity.Property(e => e.BookingId).UseIdentityAlwaysColumn().HasColumnName("booking_id");
+
+                entity.Property(e => e.BookingDate)   // ✅ NEW
+                    .HasColumnName("booking_date")
+                    .HasDefaultValueSql("CURRENT_DATE");
+
                 entity.Property(e => e.BookingEnd).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '18:00:00'::interval)").HasColumnName("booking_end");
                 entity.Property(e => e.BookingStart).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '09:00:00'::interval)").HasColumnName("booking_start");
                 entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
@@ -73,6 +78,8 @@ namespace backend.Data
                     .HasConstraintName("bookings_user_id_fkey");
             });
 
+
+            // === DESKS ===
             modelBuilder.Entity<Desk>(entity =>
             {
                 entity.HasKey(e => e.DeskId).HasName("desks_pkey");
@@ -84,7 +91,7 @@ namespace backend.Data
                 entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
                 entity.Property(e => e.CreatedBy).HasColumnName("created_by");
                 entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
-                entity.Property(e => e.IsActive).HasColumnName("isActive");
+                entity.Property(e => e.IsActive).HasColumnName("isactive");
                 entity.Property(e => e.WorkspaceId).HasColumnName("workspace_id");
 
                 entity.HasOne(d => d.CreatedByNavigation)
@@ -98,7 +105,6 @@ namespace backend.Data
                     .HasForeignKey(d => d.WorkspaceId)
                     .HasConstraintName("desks_workspace_id_fkey");
             });
-
 
             // === FACILITIES ===
             modelBuilder.Entity<Facility>(entity =>
@@ -141,9 +147,7 @@ namespace backend.Data
 
                 entity.HasIndex(e => e.Email, "users_email_key").IsUnique();
 
-                entity.Property(e => e.UserId)
-                    .UseIdentityAlwaysColumn()
-                    .HasColumnName("user_id");
+                entity.Property(e => e.UserId).UseIdentityAlwaysColumn().HasColumnName("user_id");
                 entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
                 entity.Property(e => e.CreatedBy).HasColumnName("created_by");
                 entity.Property(e => e.Email).HasColumnType("citext").HasColumnName("email");
@@ -170,7 +174,21 @@ namespace backend.Data
                 entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
                 entity.Property(e => e.FloorNumber).HasDefaultValueSql("'2nd Floor'::text").HasColumnName("floor_number");
                 entity.Property(e => e.WorkspaceName).HasMaxLength(50).HasColumnName("workspace_name");
+                entity.Property(e => e.Capacity).HasColumnName("capacity");   
             });
+
+            // === SEED WORKSPACES ===
+            modelBuilder.Entity<Workspace>().HasData(
+                new Workspace { WorkspaceId = 1, WorkspaceName = "A", FloorNumber = "1", DeskCode = "A", Capacity = 7 },
+                new Workspace { WorkspaceId = 2, WorkspaceName = "B", FloorNumber = "1", DeskCode = "B", Capacity = 7 },
+                new Workspace { WorkspaceId = 3, WorkspaceName = "C", FloorNumber = "1", DeskCode = "C", Capacity = 7 },
+                new Workspace { WorkspaceId = 4, WorkspaceName = "D", FloorNumber = "1", DeskCode = "D", Capacity = 7 },
+                new Workspace { WorkspaceId = 5, WorkspaceName = "E", FloorNumber = "1", DeskCode = "E", Capacity = 7 },
+                new Workspace { WorkspaceId = 6, WorkspaceName = "F", FloorNumber = "1", DeskCode = "F", Capacity = 7 },
+                new Workspace { WorkspaceId = 7, WorkspaceName = "G", FloorNumber = "1", DeskCode = "G", Capacity = 7 },
+                new Workspace { WorkspaceId = 8, WorkspaceName = "H", FloorNumber = "1", DeskCode = "H", Capacity = 7 },
+                new Workspace { WorkspaceId = 9, WorkspaceName = "I", FloorNumber = "1", DeskCode = "I", Capacity = 7 }
+            );
 
             OnModelCreatingPartial(modelBuilder);
         }
