@@ -1,92 +1,91 @@
 // src/lib/reservations.ts
-// Minimal reservation adapter for the MVP.
-// Today it writes/reads from localStorage. When backend is ready,
-// replace the internals with real API calls but KEEP the same function signatures.
+import { createBooking, listBookings, getUserByEmail } from "./api";
+import type { BookingResponse, BookingCreateRequest, UserResponse } from "./api";
 
-export type Reservation = {
-  id: string;         // uuid
-  deskId: number;     // 1..62
-  dateISO: string;    // "YYYY-MM-DD" for Europe/Istanbul (local day)
-  startISO: string;   // ISO-8601 datetime string
-  endISO: string;     // ISO-8601 datetime string
-  ownerEmail: string; // who booked
-};
+export type Reservation = BookingResponse & { user?: UserResponse };
 
-const KEY = "reservations:v1";
+const userCache = new Map<number, UserResponse>();
 
-/** Read all reservations (localStorage-backed). */
-export function readAll(): Reservation[] {
-  try { return JSON.parse(localStorage.getItem(KEY) || "[]"); }
-  catch { return []; }
+// Expand booking with user info if cached
+async function expandUser(b: BookingResponse): Promise<Reservation> {
+  const cached = userCache.get(b.userId);
+  return cached ? { ...b, user: cached } : { ...b };
 }
 
-/** Overwrite all reservations (localStorage-backed). */
-export function writeAll(list: Reservation[]) {
-  localStorage.setItem(KEY, JSON.stringify(list));
+// Get all reservations
+export async function getAllReservations(): Promise<Reservation[]> {
+  try {
+    const bookings = await listBookings();
+    return await Promise.all(bookings.map(expandUser));
+  } catch (err) {
+    console.error("getAllReservations failed:", err);
+    return [];
+  }
 }
 
-/** Get reservations for a specific user (email). */
-export function byUser(email: string): Reservation[] {
-  return readAll().filter(r => r.ownerEmail === email);
+// Make a reservation (payload aligned with backend BookingCreateRequest)
+export async function makeReservation(payload: BookingCreateRequest): Promise<Reservation> {
+  console.log("[Reservation Payload]", payload);
+
+  try {
+    const res = await createBooking(payload);
+
+    // Try to fetch user details by email (optional)
+    try {
+      const user = await getUserByEmail(payload.userId.toString()); // careful: your API expects email, not id
+      userCache.set(user.userId, user);
+      return { ...res, user };
+    } catch {
+      return { ...res };
+    }
+  } catch (err) {
+    console.error("Failed to create booking:", err);
+    throw err;
+  }
 }
 
-/** Remove a reservation by id. Returns the new list (all users). */
-export function remove(id: string): Reservation[] {
-  const next = readAll().filter(r => r.id !== id);
-  writeAll(next);
-  return next;
+// Filter reservations by user email
+export function byUser(email: string) {
+  return (r: Reservation) => r.user?.email === email;
 }
 
-/** True if the reservation already ended (used by Profile's Past tab). */
-export function isPast(res: Reservation) {
-  return new Date(res.endISO).getTime() < Date.now();
+// Remove a reservation by ID
+export function remove(items: Reservation[], id: number) {
+  return items.filter((r) => r.bookingId !== id);
 }
 
-/** Format date/time labels in 24h English for Europe/Istanbul. */
-export function fmtRangeEnGB(isoStart: string, isoEnd: string) {
-  const optDate: Intl.DateTimeFormatOptions = {
-    timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit"
-  };
-  const optTime: Intl.DateTimeFormatOptions = {
-    timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit", hour12: false
-  };
-  const d = new Intl.DateTimeFormat("en-GB", optDate).format(new Date(isoStart));
-  const s = new Intl.DateTimeFormat("en-GB", optTime).format(new Date(isoStart));
-  const e = new Intl.DateTimeFormat("en-GB", optTime).format(new Date(isoEnd));
-  return { dateLabel: d, timeLabel: `${s}–${e}` };
+// Check if reservation is in the past
+export function isPast(r: Reservation) {
+  return new Date(r.bookingEnd).getTime() < Date.now();
 }
 
-/** Format a Date as "YYYY-MM-DD" for the Europe/Istanbul local day. */
-function ymdInIstanbul(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit"
-  }).format(date); // en-CA -> YYYY-MM-DD
-}
+// Format range into date + time labels
+export function fmtRangeEnGB(startISO: string, endISO: string) {
+  const start = new Date(startISO);
+  const end = new Date(endISO);
 
-/**
- * Create a reservation (MVP).
- * - Today: writes to localStorage.
- * - Later: swap internals with a POST /api/reservations call (same signature).
- */
-export async function createReservation(
-  deskId: number,
-  start: Date,
-  end: Date,
-  ownerEmail: string,
-  deskLabel?: string // NEW (optional param)
-): Promise<Reservation> {
-  const newRes: Reservation = {
-    id: crypto.randomUUID(),
-    deskId,
-    dateISO: ymdInIstanbul(start),
-    startISO: new Date(start).toISOString(),
-    endISO: new Date(end).toISOString(),
-    ownerEmail,
-    deskLabel, // NEW
-  };
+  const dateLabel = start.toLocaleDateString("en-GB", {
+    timeZone: "Europe/Istanbul",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 
+  const timeLabel =
+    start.toLocaleTimeString("en-GB", {
+      timeZone: "Europe/Istanbul",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }) +
+    " – " +
+    end.toLocaleTimeString("en-GB", {
+      timeZone: "Europe/Istanbul",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
 
-  const all = readAll();
-  writeAll([...all, newRes]);
-  return newRes;
+  return { dateLabel, timeLabel };
 }
