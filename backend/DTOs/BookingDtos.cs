@@ -20,7 +20,7 @@ namespace backend.DTOs
     {
         [Required] public int UserId { get; set; }
         [Required] public int DeskId { get; set; }
-        [Required] public DateTime BookingDate { get; set; }   // ✅ new
+        [Required] public DateTime BookingDate { get; set; }   
         [Required] public DateTime BookingStart { get; set; }
         [Required] public DateTime BookingEnd { get; set; }
         public string? Status { get; set; } = "Pending";
