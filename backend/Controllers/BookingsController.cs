@@ -24,22 +24,29 @@ namespace backend.Controllers
         {
             var bookings = await _bookingService.GetAllAsync();
 
-            var response = bookings.Select(b => new BookingResponse
-            {
-                BookingId = b.BookingId,
-                UserId = b.UserId,
-                DeskId = b.DeskId,
-                BookingDate = b.BookingDate,
-                BookingStart = b.BookingStart,
-                BookingEnd = b.BookingEnd,
-                Status = b.Status,
-                Created = b.Created
-            });
-
+            var response = bookings.Select(ToResponse);
             return Ok(response);
         }
 
-        // === GET UPCOMING BOOKINGS (from Bookings table) ===
+        // === GET MY BOOKINGS ===
+        [HttpGet("my/{userId}")]
+        public async Task<IActionResult> GetMyBookings(int userId)
+        {
+            var bookings = await _bookingService.GetByUserIdAsync(userId);
+            var response = bookings.Select(ToResponse);
+            return Ok(response);
+        }
+
+        // === GET BOOKINGS BY OTHERS ===
+        [HttpGet("others/{userId}")]
+        public async Task<IActionResult> GetOthersBookings(int userId)
+        {
+            var bookings = await _bookingService.GetByOthersAsync(userId);
+            var response = bookings.Select(ToResponse);
+            return Ok(response);
+        }
+
+        // === GET UPCOMING BOOKINGS ===
         [HttpGet("upcoming")]
         public async Task<IActionResult> GetUpcoming()
         {
@@ -50,17 +57,7 @@ namespace backend.Controllers
                 .Where(b => b.BookingDate.Date > now.Date ||
                            (b.BookingDate.Date == now.Date && b.BookingEnd > now))
                 .OrderBy(b => b.BookingDate)
-                .Select(b => new BookingResponse
-                {
-                    BookingId = b.BookingId,
-                    UserId = b.UserId,
-                    DeskId = b.DeskId,
-                    BookingDate = b.BookingDate,
-                    BookingStart = b.BookingStart,
-                    BookingEnd = b.BookingEnd,
-                    Status = b.Status,
-                    Created = b.Created
-                });
+                .Select(ToResponse);
 
             return Ok(upcoming);
         }
@@ -92,19 +89,7 @@ namespace backend.Controllers
             var booking = await _bookingService.GetByIdAsync(id);
             if (booking == null) return NotFound();
 
-            var response = new BookingResponse
-            {
-                BookingId = booking.BookingId,
-                UserId = booking.UserId,
-                DeskId = booking.DeskId,
-                BookingDate = booking.BookingDate,
-                BookingStart = booking.BookingStart,
-                BookingEnd = booking.BookingEnd,
-                Status = booking.Status,
-                Created = booking.Created
-            };
-
-            return Ok(response);
+            return Ok(ToResponse(booking));
         }
 
         // === CREATE BOOKING ===
@@ -125,21 +110,14 @@ namespace backend.Controllers
             };
 
             await _bookingService.AddAsync(booking);
-            await _auditLogService.AddAsync(new AuditLog { UserId = request.UserId, Action = "Created Booking" });
+            await _auditLogService.AddAsync(new AuditLog 
+            { 
+                UserId = request.UserId, 
+                Action = "Created Booking", 
+                LogTime = DateTime.UtcNow 
+            });
 
-            var response = new BookingResponse
-            {
-                BookingId = booking.BookingId,
-                UserId = booking.UserId,
-                DeskId = booking.DeskId,
-                BookingDate = booking.BookingDate,
-                BookingStart = booking.BookingStart,
-                BookingEnd = booking.BookingEnd,
-                Status = booking.Status,
-                Created = booking.Created
-            };
-
-            return CreatedAtAction(nameof(GetById), new { id = booking.BookingId }, response);
+            return CreatedAtAction(nameof(GetById), new { id = booking.BookingId }, ToResponse(booking));
         }
 
         // === UPDATE BOOKING ===
@@ -158,7 +136,12 @@ namespace backend.Controllers
             booking.Status = request.Status;
 
             await _bookingService.UpdateAsync(booking);
-            await _auditLogService.AddAsync(new AuditLog { UserId = booking.UserId, Action = "Updated Booking" });
+            await _auditLogService.AddAsync(new AuditLog 
+            { 
+                UserId = booking.UserId, 
+                Action = "Updated Booking", 
+                LogTime = DateTime.UtcNow 
+            });
 
             return NoContent();
         }
@@ -171,9 +154,28 @@ namespace backend.Controllers
             if (booking == null) return NotFound();
 
             await _bookingService.DeleteAsync(booking.BookingId);
-            await _auditLogService.AddAsync(new AuditLog { UserId = booking.UserId, Action = "Deleted Booking" });
+            await _auditLogService.AddAsync(new AuditLog 
+            { 
+                UserId = booking.UserId, 
+                Action = "Deleted Booking", 
+                LogTime = DateTime.UtcNow 
+            });
 
             return NoContent();
         }
+
+        // === HELPER METHOD ===
+        private static BookingResponse ToResponse(Booking b) =>
+            new BookingResponse
+            {
+                BookingId = b.BookingId,
+                UserId = b.UserId,
+                DeskId = b.DeskId,
+                BookingDate = b.BookingDate,
+                BookingStart = b.BookingStart,
+                BookingEnd = b.BookingEnd,
+                Status = b.Status,
+                Created = b.Created
+            };
     }
 }

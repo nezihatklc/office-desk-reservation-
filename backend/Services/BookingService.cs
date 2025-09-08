@@ -15,7 +15,7 @@ namespace backend.Services
             IBookingRepository bookingRepository,
             IDeskRepository deskRepository,
             IUserRepository userRepository,
-            AuditLogService auditLogService)   //audit log sevrice
+            AuditLogService auditLogService)   //audit log service
         {
             _bookingRepository = bookingRepository;
             _deskRepository = deskRepository;
@@ -41,7 +41,7 @@ namespace backend.Services
 
             await _bookingRepository.AddAsync(booking);
 
-            //call audit log
+            // Audit log
             await _auditLogService.AddAsync(new AuditLog
             {
                 UserId = booking.UserId,
@@ -58,7 +58,7 @@ namespace backend.Services
 
             await _bookingRepository.UpdateAsync(booking);
 
-            //call audit log
+            // Audit log
             await _auditLogService.AddAsync(new AuditLog
             {
                 UserId = booking.UserId,
@@ -75,7 +75,7 @@ namespace backend.Services
 
             await _bookingRepository.DeleteAsync(id);
 
-            //call audit log
+            // Audit log
             await _auditLogService.AddAsync(new AuditLog
             {
                 UserId = existing.UserId,
@@ -84,7 +84,19 @@ namespace backend.Services
             });
         }
 
-        public Task<List<Booking>> GetByUserIdAsync(int userId) => _bookingRepository.GetByUserIdAsync(userId);
-        public Task<List<Booking>> GetByDeskIdAsync(int deskId) => _bookingRepository.GetByDeskIdAsync(deskId);
+        // Get only bookings for the given user
+        public Task<List<Booking>> GetByUserIdAsync(int userId) =>
+            _bookingRepository.GetByUserIdAsync(userId);
+
+        // Get bookings by desk
+        public Task<List<Booking>> GetByDeskIdAsync(int deskId) =>
+            _bookingRepository.GetByDeskIdAsync(deskId);
+
+        // 🔹 NEW: Get bookings made by others
+        public async Task<List<Booking>> GetByOthersAsync(int userId)
+        {
+            var allBookings = await _bookingRepository.GetAllAsync();
+            return allBookings.Where(b => b.UserId != userId).ToList();
+        }
     }
 }

@@ -6,6 +6,7 @@ namespace backend.DTOs
         public int WorkspaceId { get; set; }
         public string DeskCode { get; set; } = null!;
         public bool IsActive { get; set; }
+        public List<string> Facilities { get; set; }
     }
 
     public class DeskCreateRequest
