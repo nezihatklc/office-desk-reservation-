@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import FloorPlan from "../components/FloorPlan";
 import type { DeskStatus, LegendKey } from "../components/FloorPlan";
-import { getAllReservations, makeReservation } from "../lib/reservations";
+import { getAllReservations, makeReservation } from "../lib/reservations"; // ✅ fixed
 import { listDesks, type DeskSummary } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
 
@@ -45,7 +45,7 @@ export default function ReservationPage() {
   const { user } = useAuth(); // Get authenticated user
   const currentEmail = user?.email ?? "guest@example.com";
   const currentUserId = user?.userId ?? 0;
-  
+
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const [date, setDate] = useState(todayStr);
@@ -125,13 +125,13 @@ export default function ReservationPage() {
       setApiError("Please select a desk first.");
       return;
     }
-    
+
     const deskId = codeToId.get(selectedId);
     if (!deskId) {
       setApiError("Unknown desk. Please refresh the page.");
       return;
     }
-    
+
     // Validation: end time must be after start time
     if (toMin(end) <= toMin(start)) {
       setApiError("End time must be after start time.");
@@ -139,52 +139,38 @@ export default function ReservationPage() {
     }
 
     // Check if desk is already booked for this time
-    const selectedDesk = viewDesks.find(d => d.id === selectedId);
+    const selectedDesk = viewDesks.find((d) => d.id === selectedId);
     if (selectedDesk?.status === "booked") {
       setApiError("This desk is already booked for the selected time.");
       return;
     }
-    
+
     setIsLoading(true);
     setApiError(null);
-    
+
     try {
-      // Create proper ISO dates for the backend
       const startISO = new Date(`${date}T${start}:00+03:00`).toISOString();
       const endISO = new Date(`${date}T${end}:00+03:00`).toISOString();
-      
-      console.log("Creating reservation:", {
-        selectedId,
-        deskId,
-        userId: currentUserId,
-        date,
-        startISO,
-        endISO
-      });
 
-      // Make the reservation using backend format
       const reservationPayload = {
         userId: currentUserId,
         deskId: deskId,
         bookingDate: new Date(`${date}T00:00:00Z`).toISOString(),
         bookingStart: startISO,
         bookingEnd: endISO,
-        status: "Confirmed"
+        status: "Confirmed",
       };
 
       const created = await makeReservation(reservationPayload);
-      
-      // Add the new reservation to local state
+
       setReservations((prev) => [...prev, created]);
-      
+
       setToast(
         `Reserved ${selectedId} for ${user.firstName} ${user.lastName} (${start}-${end})`
       );
       setTimeout(() => setToast(null), 3000);
-      
-      // Clear selection
+
       setSelectedId(null);
-      
     } catch (err: any) {
       console.error("Reservation failed:", err);
       setApiError(err?.message || "Reservation failed. Please try again.");
@@ -202,100 +188,60 @@ export default function ReservationPage() {
       .sort((a, b) => a.bookingStart.localeCompare(b.bookingStart));
   }, [selectedId, reservations, codeToId, date]);
 
-  // Show user info in header
   const userInfo = user ? `${user.firstName} ${user.lastName} (${user.email})` : "Not logged in";
 
   return (
     <div className="container">
-      {/* User info header */}
       <div className="panel-glass" style={{ marginBottom: 16, padding: "12px 16px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <strong>Signed in as:</strong> {userInfo}
-          </div>
-          <div className="muted">
-            Today: {new Date().toLocaleDateString()}
-          </div>
+          <div><strong>Signed in as:</strong> {userInfo}</div>
+          <div className="muted">Today: {new Date().toLocaleDateString()}</div>
         </div>
       </div>
 
-      {apiError && (
-        <div className="panel-warn" style={{ marginBottom: 12 }}>
-          {apiError}
-        </div>
-      )}
+      {apiError && <div className="panel-warn" style={{ marginBottom: 12 }}>{apiError}</div>}
 
-      {/* Top controls */}
       <div className="panel-glass top-controls" style={{ marginBottom: 16 }}>
         <div className="col">
           <label className="label">Date</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="input"
-            min={todayStr}
-          />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" min={todayStr} />
         </div>
         <div className="col">
           <label className="label">Start</label>
           <select value={start} onChange={(e) => setStart(e.target.value)} className="input">
-            {TIME_OPTS.slice(0, -1).map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
+            {TIME_OPTS.slice(0, -1).map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
         <div className="col">
           <label className="label">End</label>
           <select value={end} onChange={(e) => setEnd(e.target.value)} className="input">
-            {TIME_OPTS.slice(1).map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
+            {TIME_OPTS.slice(1).map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </div>
         <div className="col" style={{ alignSelf: "end" }}>
-          <button 
-            className="btn btn-primary" 
-            onClick={handleReserve}
-            disabled={isLoading || !user || !selectedId}
-          >
+          <button className="btn btn-primary" onClick={handleReserve} disabled={isLoading || !user || !selectedId}>
             {isLoading ? "Reserving..." : "Reserve selected"}
           </button>
         </div>
       </div>
 
       <div className="page-grid">
-        {/* Floor visualization */}
         <div className="panel-glass floor-wrap">
-          <FloorPlan
-            desks={viewDesks}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
+          <FloorPlan desks={viewDesks} selectedId={selectedId} onSelect={setSelectedId} />
         </div>
 
-        {/* Sidebar */}
         <aside className="col" style={{ gap: 16 }}>
           <div className="panel-glass">
             <h2 style={{ marginBottom: 8 }}>Desk Details</h2>
             {selectedId ? (
               <>
                 <div className="muted">Selected desk</div>
-                <div style={{ fontWeight: 800, fontSize: 22, marginBottom: 8 }}>
-                  {selectedId}
-                </div>
+                <div style={{ fontWeight: 800, fontSize: 22, marginBottom: 8 }}>{selectedId}</div>
 
                 {selectedDeskBookings.length > 0 ? (
                   selectedDeskBookings.map((r) => (
                     <p key={r.bookingId} className="muted">
-                      Reserved by{" "}
-                      <strong>
-                        {r.user?.firstName} {r.user?.lastName}
-                      </strong>{" "}
+                      Reserved by <strong>{r.user?.firstName} {r.user?.lastName}</strong>{" "}
                       ({isoToHHMMInTR(r.bookingStart)}–{isoToHHMMInTR(r.bookingEnd)})
                     </p>
                   ))
@@ -303,12 +249,7 @@ export default function ReservationPage() {
                   <p className="muted">No reservations for {date}.</p>
                 )}
 
-                <button 
-                  className="btn btn-primary" 
-                  style={{ marginTop: 12 }} 
-                  onClick={handleReserve}
-                  disabled={isLoading || !user}
-                >
+                <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={handleReserve} disabled={isLoading || !user}>
                   {isLoading ? "Reserving..." : "Reserve this desk"}
                 </button>
               </>
@@ -337,19 +278,11 @@ export default function ReservationPage() {
       </div>
 
       {toast && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 16,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "rgba(0,0,0,0.85)",
-            color: "#fff",
-            padding: "8px 12px",
-            borderRadius: 12,
-            zIndex: 50,
-          }}
-        >
+        <div style={{
+          position: "fixed", bottom: 16, left: "50%",
+          transform: "translateX(-50%)", background: "rgba(0,0,0,0.85)",
+          color: "#fff", padding: "8px 12px", borderRadius: 12, zIndex: 50,
+        }}>
           {toast}
         </div>
       )}

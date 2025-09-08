@@ -1,36 +1,41 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
-import { listUpcomingBookings, listPastBookings } from "../lib/api";
-import type { BookingResponse } from "../lib/api";
+import {
+  listUpcomingBookings,
+  listPastBookings,
+  type BookingResponse,
+  type AuditLogResponse,
+} from "../lib/api";
 
 type TabKey = "upcoming" | "past";
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const email = user?.email || "";
+  const userId = user?.userId;
 
   const [tab, setTab] = useState<TabKey>("upcoming");
   const [upcoming, setUpcoming] = useState<BookingResponse[]>([]);
-  const [past, setPast] = useState<BookingResponse[]>([]);
+  const [past, setPast] = useState<AuditLogResponse[]>([]);
 
   // Load reservations from backend
   useEffect(() => {
     (async () => {
-      if (!email) return;
+      if (!userId) return;
 
       try {
         if (tab === "upcoming") {
           const data = await listUpcomingBookings();
-          setUpcoming(data.filter(r => r.userId && r));
+          setUpcoming(data.filter(r => r.userId === userId));
         } else {
           const data = await listPastBookings();
-          setPast(data.filter(r => r.userId && r));
+          setPast(data.filter(r => r.userId === userId));
         }
       } catch (err) {
         console.error("Failed to load reservations:", err);
       }
     })();
-  }, [email, tab]);
+  }, [userId, tab]);
 
   const list = tab === "upcoming" ? upcoming : past;
 
@@ -38,7 +43,9 @@ export default function ProfilePage() {
     <div className="container">
       <div className="panel-glass card">
         <h1 className="auth-title" style={{ textAlign: "left" }}>My Reservations</h1>
-        <p className="muted" style={{ marginBottom: 12 }}>Signed in as {email}</p>
+        <p className="muted" style={{ marginBottom: 12 }}>
+          Signed in as {email || "Guest"}
+        </p>
 
         {/* Tabs */}
         <div className="row" style={{ marginBottom: 12 }}>
@@ -63,27 +70,42 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="col" style={{ gap: 12 }}>
-            {list.map(r => (
-              <div key={r.bookingId} className="panel-glass" style={{ display: "grid", gap: 8 }}>
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <strong>Desk #{r.deskId}</strong>
-                  <span className="badge">{r.status}</span>
+            {tab === "upcoming" &&
+              upcoming.map(r => (
+                <div key={r.bookingId} className="panel-glass" style={{ display: "grid", gap: 8 }}>
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <strong>Desk #{r.deskId}</strong>
+                    <span className="badge">{r.status}</span>
+                  </div>
+                  <div className="row" style={{ flexWrap: "wrap" }}>
+                    <div>
+                      <span className="label">Date</span>
+                      <p>{new Date(r.bookingDate).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <span className="label" style={{ marginLeft: 16 }}>Time</span>
+                      <p>
+                        {new Date(r.bookingStart).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
+                        {new Date(r.bookingEnd).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="row" style={{ flexWrap: "wrap" }}>
+              ))}
+
+            {tab === "past" &&
+              past.map(log => (
+                <div key={log.logId} className="panel-glass" style={{ display: "grid", gap: 8 }}>
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <strong>Action:</strong>
+                    <span className="badge">{log.action}</span>
+                  </div>
                   <div>
                     <span className="label">Date</span>
-                    <p>{new Date(r.bookingDate).toLocaleDateString()}</p>
-                  </div>
-                  <div>
-                    <span className="label" style={{ marginLeft: 16 }}>Time</span>
-                    <p>
-                      {new Date(r.bookingStart).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
-                      {new Date(r.bookingEnd).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </p>
+                    <p>{new Date(log.logTime).toLocaleString()}</p>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
         )}
       </div>

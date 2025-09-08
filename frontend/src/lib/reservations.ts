@@ -1,15 +1,18 @@
 // src/lib/reservations.ts
-import { createBooking, listBookings, getUserByEmail } from "./api";
+
+import { createBooking, listBookings } from "./api";
 import type { BookingResponse, BookingCreateRequest, UserResponse } from "./api";
 
 export type Reservation = BookingResponse & { user?: UserResponse };
 
+// cache user lookups if needed in the future
 const userCache = new Map<number, UserResponse>();
 
-// Expand booking with user info if cached
 async function expandUser(b: BookingResponse): Promise<Reservation> {
-  const cached = userCache.get(b.userId);
-  return cached ? { ...b, user: cached } : { ...b };
+  if (userCache.has(b.userId)) {
+    return { ...b, user: userCache.get(b.userId) };
+  }
+  return { ...b };
 }
 
 // Get all reservations
@@ -23,43 +26,54 @@ export async function getAllReservations(): Promise<Reservation[]> {
   }
 }
 
-// Make a reservation (payload aligned with backend BookingCreateRequest)
-export async function makeReservation(payload: BookingCreateRequest): Promise<Reservation> {
-  console.log("[Reservation Payload]", payload);
+// ✅ Single makeReservation function using payload
+export async function makeReservation(payload: {
+  userId: number;
+  deskId: number;
+  bookingDate: string;
+  bookingStart: string;
+  bookingEnd: string;
+  status?: string;
+}): Promise<Reservation> {
+  const req: BookingCreateRequest = {
+    userId: payload.userId,
+    deskId: payload.deskId,
+    bookingDate: payload.bookingDate,
+    bookingStart: payload.bookingStart,
+    bookingEnd: payload.bookingEnd,
+    status: payload.status || "Confirmed",
+  };
+
+  console.log("[Reservation Payload]", req);
 
   try {
-    const res = await createBooking(payload);
+    const res = await createBooking(req);
 
-    // Try to fetch user details by email (optional)
-    try {
-      const user = await getUserByEmail(payload.userId.toString()); // careful: your API expects email, not id
-      userCache.set(user.userId, user);
-      return { ...res, user };
-    } catch {
-      return { ...res };
+    const cachedUser = userCache.get(payload.userId);
+    if (cachedUser) {
+      return { ...res, user: cachedUser };
     }
+
+    return { ...res };
   } catch (err) {
     console.error("Failed to create booking:", err);
     throw err;
   }
 }
 
-// Filter reservations by user email
+// Filters & helpers
 export function byUser(email: string) {
   return (r: Reservation) => r.user?.email === email;
 }
 
-// Remove a reservation by ID
 export function remove(items: Reservation[], id: number) {
   return items.filter((r) => r.bookingId !== id);
 }
 
-// Check if reservation is in the past
 export function isPast(r: Reservation) {
   return new Date(r.bookingEnd).getTime() < Date.now();
 }
 
-// Format range into date + time labels
 export function fmtRangeEnGB(startISO: string, endISO: string) {
   const start = new Date(startISO);
   const end = new Date(endISO);
