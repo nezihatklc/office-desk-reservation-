@@ -69,23 +69,20 @@ namespace backend.Controllers
             });
         }
 
-        // PUT: api/Facilities/{id}
         [HttpPut("{id}")]
         public async Task<ActionResult> Update(int id, [FromBody] FacilityUpdateRequest request)
         {
-            if (id != request.FacilityId)
-                throw new BadRequestException("ID in URL and body do not match.");
+            var facility = await _facilityService.GetByIdAsync(id);
+            if (facility == null)
+                throw new NotFoundException($"Facility with ID {id} not found.");
 
-            var facility = new Facility
-            {
-                FacilityId = request.FacilityId,
-                Name = request.Name,
-                Description = request.Description
-            };
+            facility.Name = request.Name;
+            facility.Description = request.Description;
 
             await _facilityService.UpdateAsync(facility);
             return NoContent();
         }
+
 
         // DELETE: api/Facilities/{id}
         [HttpDelete("{id}")]

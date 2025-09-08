@@ -21,6 +21,9 @@ namespace backend.Models
         public DateTime Created { get; set; } = DateTime.UtcNow;
 
         public int? CreatedBy { get; set; }
+        
+        public ICollection<DeskFacility> DeskFacilities { get; set; }
+
 
         //navigation props
         
@@ -28,6 +31,5 @@ namespace backend.Models
         public virtual Workspace Workspace { get; set; } = null!;
     
         public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
-        public virtual ICollection<DeskFacility> DeskFacilities { get; set; } = new List<DeskFacility>();
     }
 }

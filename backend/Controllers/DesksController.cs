@@ -28,7 +28,10 @@ namespace backend.Controllers
                 DeskId = d.DeskId,
                 WorkspaceId = d.WorkspaceId,
                 DeskCode = d.DeskCode,
-                IsActive = d.IsActive
+                IsActive = d.IsActive,
+                Facilities = d.DeskFacilities
+                    .Select(df => df.Facility.Name)
+                    .ToList()
             }));
         }
 
@@ -45,7 +48,10 @@ namespace backend.Controllers
                 DeskId = desk.DeskId,
                 WorkspaceId = desk.WorkspaceId,
                 DeskCode = desk.DeskCode,
-                IsActive = desk.IsActive
+                IsActive = desk.IsActive,
+                Facilities = desk.DeskFacilities
+                    .Select(df => df.Facility.Name)
+                    .ToList()
             });
         }
 
@@ -53,7 +59,6 @@ namespace backend.Controllers
         [HttpPost]
         public async Task<ActionResult<DeskResponse>> Create([FromBody] DeskCreateRequest request)
         {
-            
             if (string.IsNullOrWhiteSpace(request.DeskCode))
                 throw new BadRequestException("DeskCode is required.");
 
@@ -73,7 +78,8 @@ namespace backend.Controllers
                 DeskId = desk.DeskId,
                 WorkspaceId = desk.WorkspaceId,
                 DeskCode = desk.DeskCode,
-                IsActive = desk.IsActive
+                IsActive = desk.IsActive,
+                Facilities = new List<string>() // new desk has no facilities yet
             });
         }
 

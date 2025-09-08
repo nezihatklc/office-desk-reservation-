@@ -14,10 +14,16 @@ namespace backend.Repositories
         }
 
         public async Task<List<Desk>> GetAllAsync() =>
-            await _context.Desks.ToListAsync();
+            await _context.Desks
+                .Include(d => d.DeskFacilities)
+                .ThenInclude(df => df.Facility)
+                .ToListAsync();
 
         public async Task<Desk?> GetByIdAsync(int id) =>
-            await _context.Desks.FindAsync(id);
+            await _context.Desks
+                .Include(d => d.DeskFacilities)
+                .ThenInclude(df => df.Facility)
+                .FirstOrDefaultAsync(d => d.DeskId == id);
 
         public async Task AddAsync(Desk desk)
         {

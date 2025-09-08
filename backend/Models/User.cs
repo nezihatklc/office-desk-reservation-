@@ -6,7 +6,7 @@ namespace backend.Models;
 public partial class User
 {
     [Key]
-    [DatabaseGenerated(DatabaseGeneratedOption.Identity)] // 👈 EF will let Postgres auto-generate UserId
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)] // EF will let Postgres auto-generate UserId
     public int UserId { get; set; }
 
     public string FirstName { get; set; } = null!;

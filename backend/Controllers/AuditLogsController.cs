@@ -47,31 +47,7 @@ namespace backend.Controllers
                 LogTime = log.LogTime
             });
         }
-
-        // POST: api/AuditLogs
-        [HttpPost]
-        public async Task<ActionResult<AuditLogResponse>> Create([FromBody] AuditLogCreateRequest request)
-        {
-            if (string.IsNullOrWhiteSpace(request.Action))
-                throw new BadRequestException("Action cannot be empty.");
-
-            var log = new AuditLog
-            {
-                UserId = request.UserId,
-                Action = request.Action,
-                LogTime = DateTime.UtcNow
-            };
-
-            await _auditLogService.AddAsync(log);
-
-            return CreatedAtAction(nameof(GetById), new { id = log.LogId }, new AuditLogResponse
-            {
-                LogId = log.LogId,
-                UserId = log.UserId,
-                Action = log.Action,
-                LogTime = log.LogTime
-            });
-        }
+        
 
         // GET: api/AuditLogs/user/{userId}
         [HttpGet("user/{userId}")]

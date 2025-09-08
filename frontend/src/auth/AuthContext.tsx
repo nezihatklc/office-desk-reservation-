@@ -1,71 +1,127 @@
-// Global auth state stored in Context. Uses localStorage for demo purposes.
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { loginUser, registerUser, type UserResponse } from "../lib/api";
 
-type User = { email: string };
+type User = {
+  userId: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+};
 
 type AuthContextType = {
   user: User | null;
-  signIn: (email: string, password: string) => Promise<string | null>;
+  isLoading: boolean;
+  signIn: (email: string, password: string) => Promise<string | null>; // uses /api/Users/login
   signOut: () => void;
-  register: (email: string, password: string, confirm: string) => Promise<string | null>;
+  register: (firstName: string, lastName: string, email: string, password: string) => Promise<string | null>; // uses /api/Users/register
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const LS_USER  = "deskapp:user";
-const LS_USERS = "deskapp:users"; // array of { email, password } (mock database)
-
-type StoredUser = { email: string; password: string };
-
-function getUsers(): StoredUser[] {
-  try { return JSON.parse(localStorage.getItem(LS_USERS) || "[]"); }
-  catch { return []; }
-}
+const LS_USER = "deskapp:user";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Add loading state for initial load
 
   // Load session on boot
   useEffect(() => {
-    const raw = localStorage.getItem(LS_USER);
-    if (raw) setUser(JSON.parse(raw));
+    try {
+      const raw = localStorage.getItem(LS_USER);
+      if (raw) {
+        const userData = JSON.parse(raw);
+        // Validate the stored data structure
+        if (userData && userData.userId && userData.email) {
+          setUser(userData);
+        } else {
+          // Clear invalid data
+          localStorage.removeItem(LS_USER);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading user from localStorage:", error);
+      localStorage.removeItem(LS_USER);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
+  // ---- LOGIN ----
   const signIn: AuthContextType["signIn"] = async (email, password) => {
-    if (!/^\S+@\S+\.\S+$/.test(email)) return "Please enter a valid email.";
-    if (password.length < 8) return "Password must be at least 8 characters.";
+    try {
+      // this calls your backend endpoint POST /api/Users/login
+      const u: UserResponse = await loginUser({ email, password });
+      
+      // Validate response
+      if (!u || !u.userId || !u.email) {
+        throw new Error("Invalid response from server");
+      }
 
-    const users = getUsers();
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (!found) return "Account not found. Please register.";
-    if (found.password !== password) return "Incorrect password.";
-
-    const u = { email: found.email };
-    localStorage.setItem(LS_USER, JSON.stringify(u));
-    setUser(u);
-    return null;
-  };
-
-  const signOut = () => {
-    localStorage.removeItem(LS_USER);
-    setUser(null);
-  };
-
-  const register: AuthContextType["register"] = async (email, password, confirm) => {
-    if (!/^\S+@\S+\.\S+$/.test(email)) return "Please enter a valid email.";
-    if (password.length < 8) return "Password must be at least 8 characters.";
-    if (password !== confirm) return "Passwords do not match.";
-
-    const users = getUsers();
-    if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-      return "This email is already registered.";
+      const authUser: User = {
+        userId: u.userId,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+      };
+      
+      // Store in localStorage and update state
+      localStorage.setItem(LS_USER, JSON.stringify(authUser));
+      setUser(authUser);
+      return null; // Success
+    } catch (err: any) {
+      console.error("signIn failed:", err);
+      return err?.message || "Login failed.";
     }
-    users.push({ email, password });
-    localStorage.setItem(LS_USERS, JSON.stringify(users));
-    return null;
   };
 
-  const value = useMemo(() => ({ user, signIn, signOut, register }), [user]);
+  // ---- LOGOUT ----
+  const signOut = () => {
+    try {
+      localStorage.removeItem(LS_USER);
+      setUser(null);
+    } catch (error) {
+      console.error("Error during signOut:", error);
+      // Still clear the user state even if localStorage fails
+      setUser(null);
+    }
+  };
+
+  // ---- REGISTER ----
+  const register: AuthContextType["register"] = async (firstName, lastName, email, password) => {
+    try {
+      // this calls your backend endpoint POST /api/Users/register
+      const u: UserResponse = await registerUser({ firstName, lastName, email, password });
+      
+      // Validate response
+      if (!u || !u.userId || !u.email) {
+        throw new Error("Invalid response from server");
+      }
+
+      const authUser: User = {
+        userId: u.userId,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+      };
+      
+      // Store in localStorage and update state
+      localStorage.setItem(LS_USER, JSON.stringify(authUser));
+      setUser(authUser);
+      return null; // Success
+    } catch (err: any) {
+      console.error("register failed:", err);
+      return err?.message || "Registration failed.";
+    }
+  };
+
+  const value = useMemo(() => ({ 
+    user, 
+    isLoading, 
+    signIn, 
+    signOut, 
+    register 
+  }), [user, isLoading]);
+  
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

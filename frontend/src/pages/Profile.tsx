@@ -1,85 +1,152 @@
-import React, { useMemo, useState, useEffect } from "react";
-import { useAuth } from "../auth/AuthContext"; // varsayım: user.email sağlıyor
-import { byUser, remove, isPast, fmtRangeEnGB } from "../lib/reservations";
-import type { Reservation } from "../lib/reservations";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../auth/AuthContext";
+import {
+  listUpcomingBookings,
+  listPastBookings,
+  type BookingResponse,
+  type AuditLogResponse,
+} from "../lib/api";
+import API from "../lib/api"; // 🔹 import axios instance for DELETE
 
 type TabKey = "upcoming" | "past";
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const email = user?.email || "";
+  const userId = user?.userId;
 
   const [tab, setTab] = useState<TabKey>("upcoming");
-  const [items, setItems] = useState<Reservation[]>([]);
+  const [upcoming, setUpcoming] = useState<BookingResponse[]>([]);
+  const [past, setPast] = useState<AuditLogResponse[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => { setItems(byUser(email)); }, [email]);
+  // Load reservations from backend
+  useEffect(() => {
+    (async () => {
+      if (!userId) return;
 
-  const { upcoming, past } = useMemo(() => {
-    const u = items.filter(r => !isPast(r));
-    const p = items.filter(r =>  isPast(r));
-    // sort: nearest first for upcoming, newest-first for past
-    u.sort((a,b) => new Date(a.startISO).getTime() - new Date(b.startISO).getTime());
-    p.sort((a,b) => new Date(b.startISO).getTime() - new Date(a.startISO).getTime());
-    return { upcoming: u, past: p };
-  }, [items]);
+      try {
+        if (tab === "upcoming") {
+          const data = await listUpcomingBookings();
+          setUpcoming(data.filter((r) => r.userId === userId));
+        } else {
+          const data = await listPastBookings();
+          setPast(data.filter((r) => r.userId === userId));
+        }
+      } catch (err) {
+        console.error("Failed to load reservations:", err);
+      }
+    })();
+  }, [userId, tab]);
+
+  // 🔹 Cancel booking
+  async function cancelBooking(id: number) {
+    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+
+    try {
+      setLoading(true);
+      await API.delete(`/Bookings/${id}`);
+      setUpcoming((prev) => prev.filter((r) => r.bookingId !== id)); // update UI
+    } catch (err) {
+      console.error("Failed to cancel booking:", err);
+      alert("Failed to cancel booking. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const list = tab === "upcoming" ? upcoming : past;
-
-  function onCancel(id: string) {
-    const ok = window.confirm("Cancel this reservation?");
-    if (!ok) return;
-    const nextAll = remove(id);
-    setItems(nextAll.filter(r => r.ownerEmail === email));
-    // basit toast simulasyonu:
-    setTimeout(() => alert("Reservation cancelled."), 10);
-  }
 
   return (
     <div className="container">
       <div className="panel-glass card">
-        <h1 className="auth-title" style={{textAlign:"left"}}>My Reservations</h1>
-        <p className="muted" style={{marginBottom:12}}>Signed in as {email}</p>
+        <h1 className="auth-title" style={{ textAlign: "left" }}>My Reservations</h1>
+        <p className="muted" style={{ marginBottom: 12 }}>
+          Signed in as {email || "Guest"}
+        </p>
 
-        {/* tabs */}
-        <div className="row" style={{marginBottom:12}}>
+        {/* Tabs */}
+        <div className="row" style={{ marginBottom: 12 }}>
           <button
-            className={`btn ${tab==="upcoming" ? "btn-primary" : "btn-ghost"}`}
+            className={`btn ${tab === "upcoming" ? "btn-primary" : "btn-ghost"}`}
             onClick={() => setTab("upcoming")}
-          >Upcoming</button>
+          >
+            Upcoming
+          </button>
           <button
-            className={`btn ${tab==="past" ? "btn-primary" : "btn-ghost"}`}
+            className={`btn ${tab === "past" ? "btn-primary" : "btn-ghost"}`}
             onClick={() => setTab("past")}
-          >Past</button>
+          >
+            Past
+          </button>
         </div>
 
-        {/* empty state */}
+        {/* Empty state */}
         {list.length === 0 ? (
           <div className="panel-dark" role="status" aria-live="polite">
-            You have no reservations.
+            You have no {tab} reservations.
           </div>
         ) : (
-          <div className="col" style={{gap:12}}>
-            {list.map(r => {
-              const { dateLabel, timeLabel } = fmtRangeEnGB(r.startISO, r.endISO);
-              const canCancel = tab === "upcoming";
-              return (
-                <div key={r.id} className="panel-glass" style={{display:"grid", gap:8}}>
-                  <div className="row" style={{justifyContent:"space-between"}}>
+          <div className="col" style={{ gap: 12 }}>
+            {tab === "upcoming" &&
+              upcoming.map((r) => (
+                <div
+                  key={r.bookingId}
+                  className="panel-glass"
+                  style={{ display: "grid", gap: 8 }}
+                >
+                  <div className="row" style={{ justifyContent: "space-between" }}>
                     <strong>Desk #{r.deskId}</strong>
-                    <span className="badge">Reservation</span>
+                    <span className="badge">{r.status}</span>
                   </div>
-                  <div className="row" style={{flexWrap:"wrap"}}>
-                    <div><span className="label">Date</span><p>{dateLabel}</p></div>
-                    <div><span className="label" style={{marginLeft:16}}>Time</span><p>{timeLabel}</p></div>
-                  </div>
-                  {canCancel && (
-                    <div className="row" style={{justifyContent:"end"}}>
-                      <button className="btn btn-primary" onClick={() => onCancel(r.id)}>Cancel</button>
+                  <div className="row" style={{ flexWrap: "wrap" }}>
+                    <div>
+                      <span className="label">Date</span>
+                      <p>{new Date(r.bookingDate).toLocaleDateString()}</p>
                     </div>
-                  )}
+                    <div>
+                      <span className="label" style={{ marginLeft: 16 }}>Time</span>
+                      <p>
+                        {new Date(r.bookingStart).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })} –{" "}
+                        {new Date(r.bookingEnd).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 🔹 Cancel button */}
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => cancelBooking(r.bookingId)}
+                    disabled={loading}
+                  >
+                    {loading ? "Cancelling..." : "Cancel"}
+                  </button>
                 </div>
-              );
-            })}
+              ))}
+
+            {tab === "past" &&
+              past.map((log) => (
+                <div
+                  key={log.logId}
+                  className="panel-glass"
+                  style={{ display: "grid", gap: 8 }}
+                >
+                  <div className="row" style={{ justifyContent: "space-between" }}>
+                    <strong>Action:</strong>
+                    <span className="badge">{log.action}</span>
+                  </div>
+                  <div>
+                    <span className="label">Date</span>
+                    <p>{new Date(log.logTime).toLocaleString()}</p>
+                  </div>
+                </div>
+              ))}
           </div>
         )}
       </div>

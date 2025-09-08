@@ -10,6 +10,8 @@ public partial class Booking
     public int UserId { get; set; }
 
     public int DeskId { get; set; }
+    
+    public DateTime BookingDate { get; set; }
 
     public DateTime BookingStart { get; set; }
 
