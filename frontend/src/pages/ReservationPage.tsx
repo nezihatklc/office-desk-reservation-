@@ -60,8 +60,7 @@ function mapStatus(
 }
 
 export default function ReservationPage() {
-  const { user } = useAuth(); // Get authenticated user
-  const currentEmail = user?.email ?? "guest@example.com";
+  const { user } = useAuth(); 
   const currentUserId = user?.userId ?? 0;
 
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
@@ -77,14 +76,14 @@ export default function ReservationPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Map deskCode <-> deskId (needed for POST)
+  // Map deskCode <-> deskId
   const codeToId = useMemo(() => {
     const map = new Map<string, number>();
     desks.forEach((d) => map.set(d.deskCode, d.deskId));
     return map;
   }, [desks]);
 
-  // Initial load: bookings + desks
+  // Initial load
   useEffect(() => {
     (async () => {
       try {
@@ -102,29 +101,26 @@ export default function ReservationPage() {
     })();
   }, []);
 
-  // Compute statuses for each real desk from backend
+  // Compute statuses
   const viewDesks: DeskStatus[] = useMemo(() => {
     return desks.map((d) => {
-      // 🔹 Default: map backend status to frontend
       let status: LegendKey = mapStatus(d.status);
 
-      // Also check live reservations for the day
       const sameDay = reservations.filter(
         (r) => (r.bookingDate ?? "").slice(0, 10) === date && r.deskId === d.deskId
       );
 
       const anyMine = sameDay
-        .filter((r) => r.userId === currentUserId)   //
+        .filter((r) => r.userId === currentUserId)
         .some((r) =>
-        overlaps(start, end, isoToHHMMInTR(r.bookingStart), isoToHHMMInTR(r.bookingEnd))
-      );
+          overlaps(start, end, isoToHHMMInTR(r.bookingStart), isoToHHMMInTR(r.bookingEnd))
+        );
 
       const anyOther = sameDay
-        .filter((r) => r.userId !== currentUserId)   
+        .filter((r) => r.userId !== currentUserId)
         .some((r) =>
-        overlaps(start, end, isoToHHMMInTR(r.bookingStart), isoToHHMMInTR(r.bookingEnd))
-      );
-
+          overlaps(start, end, isoToHHMMInTR(r.bookingStart), isoToHHMMInTR(r.bookingEnd))
+        );
 
       if (anyMine) status = "byMe";
       else if (anyOther) status = "booked";
@@ -183,12 +179,9 @@ export default function ReservationPage() {
       };
 
       const created = await makeReservation(reservationPayload);
-
       setReservations((prev) => [...prev, created]);
 
-      setToast(
-        `Reserved ${selectedId} for ${user.firstName} ${user.lastName} (${start}-${end})`
-      );
+      setToast(`Reserved ${selectedId} for ${user.firstName} ${user.lastName} (${start}-${end})`);
       setTimeout(() => setToast(null), 3000);
 
       setSelectedId(null);
@@ -199,6 +192,8 @@ export default function ReservationPage() {
       setIsLoading(false);
     }
   }
+
+  const selectedDesk = useMemo(() => desks.find(d => d.deskCode === selectedId), [desks, selectedId]);
 
   const selectedDeskBookings = useMemo(() => {
     if (!selectedId) return [];
@@ -259,6 +254,21 @@ export default function ReservationPage() {
                 <div className="muted">Selected desk</div>
                 <div style={{ fontWeight: 800, fontSize: 22, marginBottom: 8 }}>{selectedId}</div>
 
+                {/* 🔹 Show facilities */}
+                <div style={{ marginBottom: 12 }}>
+                  <h4>Facilities</h4>
+                  {selectedDesk?.facilities?.length ? (
+                    <ul>
+                      {selectedDesk.facilities.map((f) => (
+                        <li key={f}>{f}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted">No facilities listed.</p>
+                  )}
+                </div>
+
+                {/* 🔹 Show bookings */}
                 {selectedDeskBookings.length > 0 ? (
                   selectedDeskBookings.map((r) => (
                     <p key={r.bookingId} className="muted">
