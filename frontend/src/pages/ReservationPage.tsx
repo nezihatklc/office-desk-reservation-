@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import FloorPlan from "../components/FloorPlan";
 import type { DeskStatus, LegendKey } from "../components/FloorPlan";
-import { getAllReservations, makeReservation } from "../lib/reservations"; // ✅ fixed
+import { getAllReservations, makeReservation } from "../lib/reservations";
 import { listDesks, type DeskSummary } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
 
@@ -39,6 +39,24 @@ function isoToHHMMInTR(iso: string): string {
     minute: "2-digit",
     hour12: false,
   }).format(dt);
+}
+
+// 🔹 Status mapping (backend → frontend)
+function mapStatus(
+  status: string | undefined
+): "byMe" | "available" | "booked" | "unavailable" {
+  switch (status) {
+    case "MyReservation":
+      return "byMe";
+    case "BookedByOthers":
+      return "booked";
+    case "Available":
+      return "available";
+    case "Unavailable":
+      return "unavailable";
+    default:
+      return "available";
+  }
 }
 
 export default function ReservationPage() {
@@ -87,21 +105,26 @@ export default function ReservationPage() {
   // Compute statuses for each real desk from backend
   const viewDesks: DeskStatus[] = useMemo(() => {
     return desks.map((d) => {
-      let status: LegendKey = d.isActive ? "available" : "unavailable";
+      // 🔹 Default: map backend status to frontend
+      let status: LegendKey = mapStatus(d.status);
 
+      // Also check live reservations for the day
       const sameDay = reservations.filter(
         (r) => (r.bookingDate ?? "").slice(0, 10) === date && r.deskId === d.deskId
       );
 
-      const mine = sameDay.filter((r) => r.user?.email === currentEmail);
-      const anyMine = mine.some((r) =>
+      const anyMine = sameDay
+        .filter((r) => r.userId === currentUserId)   //
+        .some((r) =>
         overlaps(start, end, isoToHHMMInTR(r.bookingStart), isoToHHMMInTR(r.bookingEnd))
       );
+
       const anyOther = sameDay
-        .filter((r) => r.user?.email !== currentEmail)
+        .filter((r) => r.userId !== currentUserId)   
         .some((r) =>
-          overlaps(start, end, isoToHHMMInTR(r.bookingStart), isoToHHMMInTR(r.bookingEnd))
-        );
+        overlaps(start, end, isoToHHMMInTR(r.bookingStart), isoToHHMMInTR(r.bookingEnd))
+      );
+
 
       if (anyMine) status = "byMe";
       else if (anyOther) status = "booked";
@@ -113,7 +136,7 @@ export default function ReservationPage() {
         status,
       };
     });
-  }, [desks, reservations, date, start, end, currentEmail]);
+  }, [desks, reservations, date, start, end, currentUserId]);
 
   async function handleReserve() {
     if (!user) {
@@ -132,13 +155,11 @@ export default function ReservationPage() {
       return;
     }
 
-    // Validation: end time must be after start time
     if (toMin(end) <= toMin(start)) {
       setApiError("End time must be after start time.");
       return;
     }
 
-    // Check if desk is already booked for this time
     const selectedDesk = viewDesks.find((d) => d.id === selectedId);
     if (selectedDesk?.status === "booked") {
       setApiError("This desk is already booked for the selected time.");

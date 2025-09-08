@@ -58,6 +58,7 @@ export interface DeskSummary {
   workspaceId: number;
   deskCode: string;  // e.g., "A1"
   isActive: boolean;
+  status?: "MyReservation" | "Available" | "BookedByOthers" | "Unavailable"; // 🔹 added
 }
 
 // 🔹 Audit Logs type

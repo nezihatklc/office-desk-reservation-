@@ -6,6 +6,7 @@ import {
   type BookingResponse,
   type AuditLogResponse,
 } from "../lib/api";
+import API from "../lib/api"; // 🔹 import axios instance for DELETE
 
 type TabKey = "upcoming" | "past";
 
@@ -17,6 +18,7 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<TabKey>("upcoming");
   const [upcoming, setUpcoming] = useState<BookingResponse[]>([]);
   const [past, setPast] = useState<AuditLogResponse[]>([]);
+  const [loading, setLoading] = useState(false);
 
   // Load reservations from backend
   useEffect(() => {
@@ -26,16 +28,32 @@ export default function ProfilePage() {
       try {
         if (tab === "upcoming") {
           const data = await listUpcomingBookings();
-          setUpcoming(data.filter(r => r.userId === userId));
+          setUpcoming(data.filter((r) => r.userId === userId));
         } else {
           const data = await listPastBookings();
-          setPast(data.filter(r => r.userId === userId));
+          setPast(data.filter((r) => r.userId === userId));
         }
       } catch (err) {
         console.error("Failed to load reservations:", err);
       }
     })();
   }, [userId, tab]);
+
+  // 🔹 Cancel booking
+  async function cancelBooking(id: number) {
+    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+
+    try {
+      setLoading(true);
+      await API.delete(`/Bookings/${id}`);
+      setUpcoming((prev) => prev.filter((r) => r.bookingId !== id)); // update UI
+    } catch (err) {
+      console.error("Failed to cancel booking:", err);
+      alert("Failed to cancel booking. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const list = tab === "upcoming" ? upcoming : past;
 
@@ -71,8 +89,12 @@ export default function ProfilePage() {
         ) : (
           <div className="col" style={{ gap: 12 }}>
             {tab === "upcoming" &&
-              upcoming.map(r => (
-                <div key={r.bookingId} className="panel-glass" style={{ display: "grid", gap: 8 }}>
+              upcoming.map((r) => (
+                <div
+                  key={r.bookingId}
+                  className="panel-glass"
+                  style={{ display: "grid", gap: 8 }}
+                >
                   <div className="row" style={{ justifyContent: "space-between" }}>
                     <strong>Desk #{r.deskId}</strong>
                     <span className="badge">{r.status}</span>
@@ -85,17 +107,36 @@ export default function ProfilePage() {
                     <div>
                       <span className="label" style={{ marginLeft: 16 }}>Time</span>
                       <p>
-                        {new Date(r.bookingStart).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} –{" "}
-                        {new Date(r.bookingEnd).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {new Date(r.bookingStart).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })} –{" "}
+                        {new Date(r.bookingEnd).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </p>
                     </div>
                   </div>
+
+                  {/* 🔹 Cancel button */}
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => cancelBooking(r.bookingId)}
+                    disabled={loading}
+                  >
+                    {loading ? "Cancelling..." : "Cancel"}
+                  </button>
                 </div>
               ))}
 
             {tab === "past" &&
-              past.map(log => (
-                <div key={log.logId} className="panel-glass" style={{ display: "grid", gap: 8 }}>
+              past.map((log) => (
+                <div
+                  key={log.logId}
+                  className="panel-glass"
+                  style={{ display: "grid", gap: 8 }}
+                >
                   <div className="row" style={{ justifyContent: "space-between" }}>
                     <strong>Action:</strong>
                     <span className="badge">{log.action}</span>
