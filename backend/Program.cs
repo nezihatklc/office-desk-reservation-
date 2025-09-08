@@ -36,7 +36,12 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "https://localhost:5173") // Vite frontend
+        policy.WithOrigins(
+                "http://localhost:5173",  // frontend (Vite)
+                "https://localhost:5173",
+                "http://localhost:5138",  // swagger
+                "https://localhost:5138"
+            ) // Vite frontend
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
