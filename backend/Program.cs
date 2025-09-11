@@ -6,6 +6,8 @@ using backend.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
+
 //swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -28,6 +30,7 @@ builder.Services.AddScoped<DeskService>();
 builder.Services.AddScoped<FacilityService>();
 builder.Services.AddScoped<WorkspaceService>();
 builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<AuthService>();
 
 builder.Services.AddControllers();
 
@@ -41,7 +44,7 @@ builder.Services.AddCors(options =>
                 "https://localhost:5173",
                 "http://localhost:5138",  // swagger
                 "https://localhost:5138"
-            ) // Vite frontend
+            )
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
