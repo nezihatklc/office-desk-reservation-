@@ -3,23 +3,46 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace backend.Models;
 
-public partial class User
+[Table("users")]
+public class User
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)] // EF will let Postgres auto-generate UserId
     public int UserId { get; set; }
 
+    [Column("first_name")]
     public string FirstName { get; set; } = null!;
 
+    [Column("last_name")]
     public string LastName { get; set; } = null!;
 
+    [Column("email")]
     public string Email { get; set; } = null!;
 
+    [Column("password")]
     public string Password { get; set; } = null!;
 
-    public DateTime Created { get; set; } = DateTime.UtcNow;
+    [Column("created")]
+    public DateTime Created { get; set; }
 
+    [Column("created_by")]
     public int? CreatedBy { get; set; }
+
+    [Column("role")]
+    public string Role { get; set; } = "User";
+
+    [Column("confirmed_email")]
+    public bool ConfirmedEmail { get; set; }
+
+    [Column("confirmed_email_token")]
+    public string? ConfirmedEmailToken { get; set; }
+
+    [Column("reset_password_token",  TypeName = "varchar(250)")]
+    public string? ResetPasswordToken { get; set; }
+
+    [Column("reset_password_expiry", TypeName = "timestamptz")]
+    public DateTime? ResetPasswordExpiry { get; set; }
+
 
     public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 
