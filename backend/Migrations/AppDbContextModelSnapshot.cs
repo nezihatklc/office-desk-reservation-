@@ -140,7 +140,7 @@ namespace backend.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
-                        .HasColumnName("isActive");
+                        .HasColumnName("is_active");
 
                     b.Property<int>("WorkspaceId")
                         .HasColumnType("integer")
@@ -215,6 +215,22 @@ namespace backend.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<int>("UserId"));
 
+                    b.Property<bool>("ConfirmedEmail")
+                        .HasColumnType("boolean")
+                        .HasColumnName("confirmed_email");
+
+                    b.Property<string>("ConfirmedEmailCode")
+                        .HasColumnType("varchar(6)")
+                        .HasColumnName("confirmed_email_code");
+
+                    b.Property<DateTime?>("ConfirmedEmailCodeExpiry")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("confirmed_email_code_expiry");
+
+                    b.Property<string>("ConfirmedEmailToken")
+                        .HasColumnType("text")
+                        .HasColumnName("confirmed_email_token");
+
                     b.Property<DateTime>("Created")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -248,6 +264,29 @@ namespace backend.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("password");
 
+                    b.Property<string>("PreferredFocusMode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("preferred_focus_mode");
+
+                    b.Property<DateTime?>("ResetPasswordExpiry")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("reset_password_expiry");
+
+                    b.Property<string>("ResetPasswordToken")
+                        .HasColumnType("varchar(250)")
+                        .HasColumnName("reset_password_token");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role");
+
+                    b.Property<string>("TeamName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("team_name");
+
                     b.HasKey("UserId")
                         .HasName("users_pkey");
 
@@ -279,17 +318,29 @@ namespace backend.Migrations
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                     b.Property<string>("DeskCode")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("desk_code");
 
                     b.Property<string>("FloorNumber")
-                        .IsRequired()
                         .ValueGeneratedOnAdd()
                         .HasColumnType("text")
                         .HasColumnName("floor_number")
                         .HasDefaultValueSql("'2nd Floor'::text");
+
+                    b.Property<string>("FocusMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasDefaultValue("Mixed")
+                        .HasColumnName("focus_mode");
+
+                    b.Property<int>("NoiseLevel")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3)
+                        .HasColumnName("noise_level");
 
                     b.Property<string>("WorkspaceName")
                         .IsRequired()
@@ -310,81 +361,99 @@ namespace backend.Migrations
                         {
                             WorkspaceId = 1,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "A",
                             FloorNumber = "1",
+                            FocusMode = "Focus",
+                            NoiseLevel = 1,
                             WorkspaceName = "A"
                         },
                         new
                         {
                             WorkspaceId = 2,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "B",
                             FloorNumber = "1",
+                            FocusMode = "Focus",
+                            NoiseLevel = 1,
                             WorkspaceName = "B"
                         },
                         new
                         {
                             WorkspaceId = 3,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "C",
                             FloorNumber = "1",
+                            FocusMode = "Focus",
+                            NoiseLevel = 2,
                             WorkspaceName = "C"
                         },
                         new
                         {
                             WorkspaceId = 4,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "D",
                             FloorNumber = "1",
+                            FocusMode = "Mixed",
+                            NoiseLevel = 3,
                             WorkspaceName = "D"
                         },
                         new
                         {
                             WorkspaceId = 5,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "E",
                             FloorNumber = "1",
+                            FocusMode = "Mixed",
+                            NoiseLevel = 3,
                             WorkspaceName = "E"
                         },
                         new
                         {
                             WorkspaceId = 6,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "F",
                             FloorNumber = "1",
+                            FocusMode = "Collaboration",
+                            NoiseLevel = 4,
                             WorkspaceName = "F"
                         },
                         new
                         {
                             WorkspaceId = 7,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "G",
                             FloorNumber = "1",
+                            FocusMode = "Collaboration",
+                            NoiseLevel = 4,
                             WorkspaceName = "G"
                         },
                         new
                         {
                             WorkspaceId = 8,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "H",
                             FloorNumber = "1",
+                            FocusMode = "Collaboration",
+                            NoiseLevel = 5,
                             WorkspaceName = "H"
                         },
                         new
                         {
                             WorkspaceId = 9,
                             Capacity = 7,
-                            Created = new DateTime(1, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified),
+                            Created = new DateTime(2024, 3, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             DeskCode = "I",
                             FloorNumber = "1",
+                            FocusMode = "Mixed",
+                            NoiseLevel = 2,
                             WorkspaceName = "I"
                         });
                 });
