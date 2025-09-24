@@ -6,7 +6,7 @@ namespace backend.Repositories
     {
         Task<List<Desk>> GetAllAsync();
         Task<Desk?> GetByIdAsync(int id);
-        Task AddAsync(Desk desk);
+        Task<Desk> AddAsync(Desk desk);
         Task UpdateAsync(Desk desk);
         Task DeleteAsync(int id);
     }
