@@ -23,11 +23,10 @@ namespace backend.Data
         public virtual DbSet<User> Users { get; set; }
         public virtual DbSet<Workspace> Workspaces { get; set; }
         public virtual DbSet<DeskFacility> DeskFacilities { get; set; }
-        public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning Move your connection string to appsettings.json for safety
-            => optionsBuilder.UseNpgsql("Host=localhost;Port=5433;Database=Andromeda;Username=postgres;Password=your_password");
+            => optionsBuilder.UseNpgsql("Host=localhost;Port=5433;Database=Andromeda;Username=postgres;Password=200112");
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder
@@ -36,16 +35,6 @@ namespace backend.Data
 
             {
                 base.OnModelCreating(modelBuilder);
-
-                // Ensure email is unique
-                    
-                modelBuilder.Entity<User>()
-                   .HasIndex(u => u.Email)
-                   .IsUnique();
-
-                modelBuilder.Entity<User>()
-                    .Property(u => u.Created)
-                    .HasDefaultValueSql("now()");
 
 
                 // === AUDIT LOGS ===
@@ -75,9 +64,9 @@ namespace backend.Data
                     entity.Property(e => e.BookingDate)   // ✅ NEW
                         .HasColumnName("booking_date")
                         .HasDefaultValueSql("CURRENT_DATE");
-
-                    entity.Property(e => e.BookingEnd).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '18:00:00'::interval)").HasColumnName("booking_end");
+                    
                     entity.Property(e => e.BookingStart).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '09:00:00'::interval)").HasColumnName("booking_start");
+                    entity.Property(e => e.BookingEnd).HasDefaultValueSql("(date_trunc('day', CURRENT_TIMESTAMP) + '18:00:00'::interval)").HasColumnName("booking_end");
                     entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
                     entity.Property(e => e.DeskId).HasColumnName("desk_id");
                     entity.Property(e => e.Status).HasMaxLength(50).HasColumnName("status");
@@ -90,6 +79,8 @@ namespace backend.Data
                     entity.HasOne(d => d.User).WithMany(p => p.Bookings)
                         .HasForeignKey(d => d.UserId)
                         .HasConstraintName("bookings_user_id_fkey");
+
+             
                 });
 
 
@@ -105,7 +96,7 @@ namespace backend.Data
                     entity.Property(e => e.Created).HasDefaultValueSql("CURRENT_TIMESTAMP").HasColumnName("created");
                     entity.Property(e => e.CreatedBy).HasColumnName("created_by");
                     entity.Property(e => e.DeskCode).HasMaxLength(20).HasColumnName("desk_code");
-                    entity.Property(e => e.IsActive).HasColumnName("isactive");
+                    entity.Property(e => e.IsActive).HasColumnName("is_active");
                     entity.Property(e => e.WorkspaceId).HasColumnName("workspace_id");
 
                     entity.HasOne(d => d.CreatedByNavigation)
@@ -168,6 +159,8 @@ namespace backend.Data
                     entity.Property(e => e.FirstName).HasMaxLength(50).HasColumnName("first_name");
                     entity.Property(e => e.LastName).HasMaxLength(50).HasColumnName("last_name");
                     entity.Property(e => e.Password).HasMaxLength(100).HasColumnName("password");
+                    entity.Property(e => e.TeamName).HasMaxLength(100).HasColumnName("team_name");
+                    entity.Property(e => e.PreferredFocusMode).HasMaxLength(40).HasColumnName("preferred_focus_mode");
 
                     entity.HasOne(d => d.CreatedByNavigation).WithMany(p => p.InverseCreatedByNavigation)
                         .HasForeignKey(d => d.CreatedBy)
@@ -189,19 +182,24 @@ namespace backend.Data
                     entity.Property(e => e.FloorNumber).HasDefaultValueSql("'2nd Floor'::text").HasColumnName("floor_number");
                     entity.Property(e => e.WorkspaceName).HasMaxLength(50).HasColumnName("workspace_name");
                     entity.Property(e => e.Capacity).HasColumnName("capacity");
+                    entity.Property(e => e.FocusMode).HasMaxLength(40).HasColumnName("focus_mode").HasDefaultValue("Mixed");
+                    entity.Property(e => e.NoiseLevel).HasColumnName("noise_level").HasDefaultValue(3);
+                    entity.Property(e => e.TeamName).HasMaxLength(100).HasColumnName("team_name");
                 });
 
                 // === SEED WORKSPACES ===
+                var workspaceSeedCreated = new DateTime(2024, 03, 01, 0, 0, 0, DateTimeKind.Utc);
+
                 modelBuilder.Entity<Workspace>().HasData(
-                    new Workspace { WorkspaceId = 1, WorkspaceName = "A", FloorNumber = "1", DeskCode = "A", Capacity = 7 },
-                    new Workspace { WorkspaceId = 2, WorkspaceName = "B", FloorNumber = "1", DeskCode = "B", Capacity = 7 },
-                    new Workspace { WorkspaceId = 3, WorkspaceName = "C", FloorNumber = "1", DeskCode = "C", Capacity = 7 },
-                    new Workspace { WorkspaceId = 4, WorkspaceName = "D", FloorNumber = "1", DeskCode = "D", Capacity = 7 },
-                    new Workspace { WorkspaceId = 5, WorkspaceName = "E", FloorNumber = "1", DeskCode = "E", Capacity = 7 },
-                    new Workspace { WorkspaceId = 6, WorkspaceName = "F", FloorNumber = "1", DeskCode = "F", Capacity = 7 },
-                    new Workspace { WorkspaceId = 7, WorkspaceName = "G", FloorNumber = "1", DeskCode = "G", Capacity = 7 },
-                    new Workspace { WorkspaceId = 8, WorkspaceName = "H", FloorNumber = "1", DeskCode = "H", Capacity = 7 },
-                    new Workspace { WorkspaceId = 9, WorkspaceName = "I", FloorNumber = "1", DeskCode = "I", Capacity = 7 }
+                    new Workspace { WorkspaceId = 1, WorkspaceName = "A", FloorNumber = "1", DeskCode = "A", Capacity = 7, FocusMode = "Focus", NoiseLevel = 1, Created = workspaceSeedCreated },
+                    new Workspace { WorkspaceId = 2, WorkspaceName = "B", FloorNumber = "1", DeskCode = "B", Capacity = 7, FocusMode = "Focus", NoiseLevel = 1, Created = workspaceSeedCreated },
+                    new Workspace { WorkspaceId = 3, WorkspaceName = "C", FloorNumber = "1", DeskCode = "C", Capacity = 7, FocusMode = "Focus", NoiseLevel = 2, Created = workspaceSeedCreated },
+                    new Workspace { WorkspaceId = 4, WorkspaceName = "D", FloorNumber = "1", DeskCode = "D", Capacity = 7, FocusMode = "Mixed", NoiseLevel = 3, Created = workspaceSeedCreated },
+                    new Workspace { WorkspaceId = 5, WorkspaceName = "E", FloorNumber = "1", DeskCode = "E", Capacity = 7, FocusMode = "Mixed", NoiseLevel = 3, Created = workspaceSeedCreated },
+                    new Workspace { WorkspaceId = 6, WorkspaceName = "F", FloorNumber = "1", DeskCode = "F", Capacity = 7, FocusMode = "Collaboration", NoiseLevel = 4, Created = workspaceSeedCreated },
+                    new Workspace { WorkspaceId = 7, WorkspaceName = "G", FloorNumber = "1", DeskCode = "G", Capacity = 7, FocusMode = "Collaboration", NoiseLevel = 4, Created = workspaceSeedCreated },
+                    new Workspace { WorkspaceId = 8, WorkspaceName = "H", FloorNumber = "1", DeskCode = "H", Capacity = 7, FocusMode = "Collaboration", NoiseLevel = 5, Created = workspaceSeedCreated },
+                    new Workspace { WorkspaceId = 9, WorkspaceName = "I", FloorNumber = "1", DeskCode = "I", Capacity = 7, FocusMode = "Mixed", NoiseLevel = 2, Created = workspaceSeedCreated }
                 );
 
                 OnModelCreatingPartial(modelBuilder);
