@@ -1,48 +1,55 @@
 using backend.Data;
 using backend.Repositories;
 using backend.Services;
-using Microsoft.EntityFrameworkCore;
 using backend.Middleware;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
-
-//swagger
+// === SWAGGER ===
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Office Desk Reservation API", Version = "v1" });
 
-//register via psql
+});
+
+// === DATABASE (PostgreSQL) ===
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-//register repos
-builder.Services.AddScoped<IUserRepository, UserRepository>();
+// === REPOSITORIES ===
 builder.Services.AddScoped<IBookingRepository, BookingRepository>();
 builder.Services.AddScoped<IDeskRepository, DeskRepository>();
 builder.Services.AddScoped<IFacilityRepository, FacilityRepository>();
 builder.Services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
-builder.Services.AddScoped<UserService>();
+// === SERVICES ===
 builder.Services.AddScoped<BookingService>();
 builder.Services.AddScoped<DeskService>();
 builder.Services.AddScoped<FacilityService>();
 builder.Services.AddScoped<WorkspaceService>();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<DeskRecommendationService>();
+builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
 
+// === CONTROLLERS ===
 builder.Services.AddControllers();
 
-// 🔹 Add CORS policy here
+// === CORS ===
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy.WithOrigins(
-                "http://localhost:5173",  // frontend (Vite)
+                "http://localhost:5173",  // Vite frontend
                 "https://localhost:5173",
-                "http://localhost:5138",  // swagger
+                "http://localhost:5138",  // Swagger
                 "https://localhost:5138"
             )
             .AllowAnyHeader()
@@ -52,7 +59,7 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Enable Swagger UI in Development
+// === MIDDLEWARE PIPELINE ===
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -63,10 +70,9 @@ app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseHttpsRedirection();
 
-// 🔹 Enable CORS before authorization
 app.UseCors("AllowFrontend");
 
-app.UseAuthorization();
+app.UseAuthentication();
 
 app.MapControllers();
 
