@@ -1,7 +1,8 @@
+// src/pages/Login.tsx
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext"; // Updated import path
+import { useAuth } from "../auth/AuthContext";
 import logo from "../assets/dfds-logo.png";
 
 export default function Login() {
@@ -11,26 +12,36 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
 
   const nav = useNavigate();
-  const { signIn } = useAuth(); // Use AuthContext instead of direct API call
+  const { signIn } = useAuth();
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    setErr(null); // clear old error
+    setErr(null);
     setIsLoading(true);
 
     try {
-      // Use signIn from AuthContext instead of loginUser directly
-      const error = await signIn(email.trim(), pw);
-      
+      const { error, user } = await signIn(email.trim(), pw);
+
       if (error) {
-        setErr(error);
+        // 🔹 Normalize error for unconfirmed email
+        const normalized = error.toLowerCase();
+        if (
+          normalized.includes("confirm your email") ||
+          normalized.includes("email not confirmed")
+        ) {
+          nav("/confirm-email-pending", { state: { email: email.trim() } });
+        } else {
+          setErr(error);
+        }
       } else {
-        console.log("Login success");
-        // redirect to floor page after successful login
-        nav("/floor", { replace: true });
+        // ✅ Login success → go to protected route
+        if (user?.role?.toLowerCase() === "admin") {
+          nav("/admin", { replace: true });
+        } else {
+          nav("/floor", { replace: true });
+        }
       }
     } catch (error: any) {
-      console.error("Login failed:", error);
       setErr(error.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
@@ -54,7 +65,10 @@ export default function Login() {
               type="email"
               placeholder="you@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setErr(null); // clear error when typing
+              }}
               required
               autoComplete="email"
               disabled={isLoading}
@@ -69,7 +83,10 @@ export default function Login() {
               type="password"
               placeholder="••••••••"
               value={pw}
-              onChange={(e) => setPw(e.target.value)}
+              onChange={(e) => {
+                setPw(e.target.value);
+                setErr(null); // clear error when typing
+              }}
               minLength={8}
               required
               autoComplete="current-password"
@@ -77,10 +94,22 @@ export default function Login() {
             />
           </div>
 
-          {err && <div className="form-error">{err}</div>}
+          {/* 🔹 Forgot password link */}
+          <p className="muted auth-hint">
+            <Link className="link" to="/forgot-password">
+              Forgot password?
+            </Link>
+          </p>
 
-          <button 
-            type="submit" 
+          {/* 🔹 Error feedback */}
+          {err && (
+            <div className="form-error" aria-live="polite">
+              {err}
+            </div>
+          )}
+
+          <button
+            type="submit"
             className="btn btn-primary btn-block btn-lg"
             disabled={isLoading}
           >
