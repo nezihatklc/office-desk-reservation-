@@ -22,5 +22,5 @@ public class RegisterDto
     [RegularExpression(@"^(?=.*[A-Z])(?=.*\d).{8,}$",
         ErrorMessage = "Password must be at least 8 characters, contain at least one uppercase letter and one number.")]
     [DataType(DataType.Password)]
-public string Password { get; set; }
+    public string Password { get; set; }
 }
