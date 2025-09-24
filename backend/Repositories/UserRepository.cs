@@ -1,3 +1,4 @@
+
 using backend.Data;
 using backend.Models;
 using Microsoft.EntityFrameworkCore;
@@ -29,7 +30,7 @@ namespace backend.Repositories
             return await _context.Users.FirstOrDefaultAsync(u => u.UserId == id);
         }
 
-        public async Task<User?> GetByEmailAsync(string email)   // implementation
+        public async Task<User?> GetByEmailAsync(string email)
         {
             return await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
         }
@@ -48,6 +49,21 @@ namespace backend.Repositories
                 _context.Users.Remove(user);
                 await _context.SaveChangesAsync();
             }
+        }
+
+        public async Task<List<User>> GetByTeamAsync(string teamName)
+        {
+            if (string.IsNullOrWhiteSpace(teamName))
+            {
+                return new List<User>();
+            }
+
+            var normalized = teamName.Trim();
+
+            return await _context.Users
+                .AsNoTracking()
+                .Where(user => user.TeamName != null && EF.Functions.ILike(user.TeamName!, normalized))
+                .ToListAsync();
         }
     }
 }
