@@ -7,6 +7,9 @@ namespace backend.DTOs
         public string DeskCode { get; set; } = null!;
         public bool IsActive { get; set; }
         public List<string> Facilities { get; set; }
+        public string? WorkspaceName { get; set; }
+        public string? FocusMode { get; set; }
+        public int? NoiseLevel { get; set; }
     }
 
     public class DeskCreateRequest
