@@ -1,7 +1,8 @@
 using backend.DTOs;
+using backend.Models;
 using backend.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
 
 namespace backend.Controllers;
 
@@ -16,93 +17,170 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
-    // 🔹 Register
+    // === REGISTER ===
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
-        if (!ModelState.IsValid) 
-            return BadRequest(ModelState);
+        try
+        {
+            var user = await _authService.Register(dto);
 
-        var user = await _authService.Register(dto);
-        return Ok(new { message = "User registered successfully", email = user.Email });
+            var response = new Dictionary<string, object>
+            {
+                ["message"] = "Registration successful. Redirecting to the email confirmation page.",
+                ["nextStep"] = "confirm-email",
+                ["user"] = new
+                {
+                    user.UserId,
+                    user.FirstName,
+                    user.LastName,
+                    user.Email,
+                    Role = user.Role
+                }
+            };
+
+#if DEBUG
+            response["devConfirmUrl"] = _authService.GetConfirmationUrl(user);
+            response["devConfirmCode"] = user.ConfirmedEmailCode;
+#endif
+
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
-    // 🔹 Login
+    // === LOGIN ===
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        var result = await _authService.Login(dto);
-        if (result == null) return Unauthorized(new { message = "Invalid credentials" });
-
-        return Ok(new
+        try
         {
-            accessToken = result.Value.accessToken,
-            refreshToken = result.Value.refreshToken
-        });
+            var user = await _authService.Login(dto);
+            if (user == null)
+                return Unauthorized(new { message = "Invalid email or password" });
+
+            return Ok(new
+            {
+                message = "Login successful",
+                user = new
+                {
+                    user.UserId,
+                    user.FirstName,
+                    user.LastName,
+                    user.Email,
+                    EmailConfirmed = user.ConfirmedEmail,
+                    Role = user.Role
+                }
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+        }
     }
 
-    // 🔹 Logout (requires authentication)
-    [Authorize]
-    [HttpPost("logout")]
-    public async Task<IActionResult> Logout([FromBody] LogoutDto dto)
+    // === CONFIRM EMAIL ===
+    [HttpPost("confirmEmail")]
+    public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailDto dto)
     {
-        var result = await _authService.Logout(dto);
-        if (!result) return NotFound(new { message = "Refresh token not found" });
+        try
+        {
+            var result = await _authService.ConfirmEmail(dto.Email, dto.Token, dto.Code);
 
-        return Ok(new { message = "Logged out successfully" });
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
-    // 🔹 Refresh access token
-    [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh([FromBody] RefreshTokenDto dto)
-    {
-        var token = await _authService.RefreshToken(dto);
-        if (token == null) return Unauthorized(new { message = "Invalid or expired refresh token" });
-
-        return Ok(new { accessToken = token });
-    }
-
-    // 🔹 Confirm email
-    [HttpGet("confirmEmail")]
-    public async Task<IActionResult> ConfirmEmail([FromQuery] int userId, [FromQuery] string token)
-    {
-        var result = await _authService.ConfirmEmail(userId, token);
-        if (!result) return BadRequest(new { message = "Invalid or expired token" });
-
-        return Ok(new { message = "Email confirmed successfully" });
-    }
-
-    // 🔹 Resend confirmation email
+    // === RESEND CONFIRMATION EMAIL ===
     [HttpPost("resendConfirmationEmail")]
-    public async Task<IActionResult> ResendConfirmationEmail([FromBody] string email)
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> ResendConfirmationEmail([FromBody] ResendEmailDto dto)
     {
-        var token = await _authService.ResendConfirmationEmail(email);
-        if (token == null) return BadRequest(new { message = "User not found or already confirmed" });
+        try
+        {
+            var (confirmUrl, otpCode) = await _authService.ResendConfirmationEmail(dto.Email);
 
-        return Ok(new { message = "Confirmation email resent" });
+            var response = new Dictionary<string, object>
+            {
+                { "message", "A new confirmation email has been sent. Please check your inbox." }
+            };
+
+#if DEBUG
+            response["devConfirmUrl"] = confirmUrl;
+            response["devConfirmCode"] = otpCode;
+#endif
+
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
     }
 
-    // 🔹 Forgot password
+    // === FORGOT PASSWORD ===
     [HttpPost("forgotPassword")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
-        var token = await _authService.ForgotPassword(dto);
-        if (token == null) return BadRequest(new { message = "User not found" });
+        try
+        {
+            var result = await _authService.ForgotPassword(dto);
+            if (result == null)
+                return NotFound(new { message = "User not found" });
 
-        return Ok(new { message = "Password reset link sent" });
+            var response = new Dictionary<string, object>
+            {
+                ["message"] = "Password reset link sent to email."
+            };
+
+#if DEBUG
+            response["devToken"] = result.Value.Token;
+            response["devResetUrl"] = result.Value.ResetUrl;
+#endif
+            return Ok(response);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
-    // 🔹 Reset password
+    // === RESET PASSWORD ===
     [HttpPost("resetPassword")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
     {
-        var result = await _authService.ResetPassword(dto);
-        if (!result) return BadRequest(new { message = "Invalid or expired reset token" });
+        try
+        {
+            var result = await _authService.ResetPassword(dto);
+            if (!result)
+                return BadRequest(new { message = "Invalid or expired reset token" });
 
-        return Ok(new { message = "Password has been reset successfully" });
+            return Ok(new { message = "Password has been reset successfully" });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
-    // 🔹 Get user info (for manage/info page)
+    // === MANAGE INFO ===
     [HttpGet("manage/info")]
     public async Task<IActionResult> GetManageInfo([FromQuery] int userId)
     {
@@ -110,5 +188,25 @@ public class AuthController : ControllerBase
         if (user == null) return NotFound(new { message = "User not found" });
 
         return Ok(user);
+    }
+
+    // === UPDATE MANAGE INFO ===
+    [HttpPut("manage/info")]
+    public async Task<IActionResult> UpdateManageInfo([FromBody] UpdateUserInfoDto dto)
+    {
+        try
+        {
+            var user = await _authService.UpdateUserInfo(dto);
+            if (user == null) return NotFound(new { message = "User not found" });
+            return Ok(new
+            {
+                message = "Profile updated successfully.",
+                user
+            });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }
