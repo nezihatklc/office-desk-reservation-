@@ -2,8 +2,8 @@
 import axios from "axios";
 
 const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE?.trim() ||
-  "http://localhost:5138/api"; // fallback to the common HTTP dev port
+  (import.meta.env.VITE_API_BASE ? import.meta.env.VITE_API_BASE.trim() : null) ||
+  "http://localhost:5138/api";
 
 console.log("[api] baseURL =", API_BASE);
 
@@ -20,9 +20,38 @@ export interface RegisterPayload {
   password: string;
 }
 
+export interface RegisterResponse {
+  user: UserResponse;
+  devConfirmUrl?: string;
+  devConfirmCode?: string;
+}
+
 export interface LoginPayload {
   email: string;
   password: string;
+}
+
+export interface ResendEmailPayload {
+  email: string;
+}
+
+export interface ForgotPasswordPayload {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+  devToken?: string;
+  devResetUrl?: string;
+}
+
+export interface ResetPasswordPayload {
+  resetToken: string;
+  newPassword: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
 }
 
 export interface UserResponse {
@@ -30,69 +59,212 @@ export interface UserResponse {
   firstName: string;
   lastName: string;
   email: string;
-  created: string; // ISO
+  emailConfirmed?: boolean;
+  role?: string;
 }
 
-export interface BookingResponse {
-  bookingId: number;
-  userId: number;
-  deskId: number;
-  bookingDate: string;   // ISO date or date-only
-  bookingStart: string;  // ISO datetime (UTC)
-  bookingEnd: string;    // ISO datetime (UTC)
-  status?: string | null;
-  created: string;       // ISO
-}
+// ---------- WORKSPACES ----------
 
-export interface BookingCreateRequest {
-  userId: number;
-  deskId: number;
-  bookingDate: string;   // "YYYY-MM-DD"
-  bookingStart: string;  // ISO datetime
-  bookingEnd: string;    // ISO datetime
-  status?: string | null;
-}
-
-export interface DeskSummary {
-  deskId: number;
+export interface WorkspaceResponse {
   workspaceId: number;
-  deskCode: string;  // e.g., "A1"
-  isActive: boolean;
-  status?: "MyReservation" | "Available" | "BookedByOthers" | "Unavailable"; // 🔹 added
+  workspaceName: string;
+  floorNumber: string;
+  deskCode: string;
+  capacity: number;
+  teamName?: string | null;
+  created: string;
 }
 
-// 🔹 Audit Logs type
-export interface AuditLogResponse {
-  logId: number;
-  userId: number;
-  action: string;
-  logTime: string; // ISO datetime
+export interface WorkspaceUpdatePayload {
+  workspaceName?: string;
+  floorNumber?: string;
+  deskCode?: string;
+  capacity?: number;
+  teamName?: string | null;
 }
 
-// ---------- Users ----------
-export async function registerUser(payload: RegisterPayload): Promise<UserResponse> {
-  const { data } = await API.post<UserResponse>("/Users/register", payload);
+export async function listWorkspaces(): Promise<WorkspaceResponse[]> {
+  const { data } = await API.get<WorkspaceResponse[]>("/Workspaces");
   return data;
+}
+
+export async function updateWorkspace(
+  workspaceId: number,
+  payload: WorkspaceUpdatePayload
+): Promise<WorkspaceResponse> {
+  const { data } = await API.put<WorkspaceResponse>(`/Workspaces/${workspaceId}`, payload);
+  return data;
+}
+
+// ---------- AUTH ----------
+
+// ---------- AUTH ----------
+
+// Register
+export async function registerUser(payload: RegisterPayload): Promise<RegisterResponse> {
+  const { data } = await API.post("/Auth/register", payload);
+  const user = data.user || data;
+  const devConfirmUrl = typeof data.devConfirmUrl === "string" ? data.devConfirmUrl : undefined;
+  const devConfirmCode = typeof data.devConfirmCode === "string" ? data.devConfirmCode : undefined;
+
+  return {
+    user: {
+      userId: user.userId,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      emailConfirmed: user.confirmedEmail ?? user.emailConfirmed ?? false,
+      role: user.role ?? user.Role,
+    },
+    devConfirmUrl,
+    devConfirmCode,
+  };
 }
 
 export async function loginUser(payload: LoginPayload): Promise<UserResponse> {
-  const { data } = await API.post<UserResponse>("/Users/login", payload);
+  const { data } = await API.post("/Auth/login", payload);
+  const user = data.user || data;
+
+  return {
+    userId: user.userId ?? user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    emailConfirmed: user.emailConfirmed ?? user.EmailConfirmed ?? user.confirmedEmail ?? false,
+    role: user.role ?? user.Role,
+  };
+}
+
+// Confirm Email
+export interface ConfirmEmailResponse {
+  message: string;
+  success?: boolean;
+}
+
+export async function confirmEmail(email: string, token: string, code: string): Promise<ConfirmEmailResponse> {
+  const { data } = await API.post("/Auth/confirmEmail", { email, token, code });
+
+  const success =
+    typeof data.success === "boolean"
+      ? data.success
+      : /success|already confirmed/i.test(String(data.message ?? ""));
+
+  return {
+    message: data.message || "",
+    success,
+  };
+}
+
+// Resend confirmation email
+export interface ResendConfirmationResponse {
+  message: string;
+  devConfirmUrl?: string;
+  devConfirmCode?: string;
+}
+
+export async function resendConfirmationEmail(payload: ResendEmailPayload): Promise<ResendConfirmationResponse> {
+  const { data } = await API.post("/Auth/resendConfirmationEmail", payload);
+  return {
+    message: data.message || "Confirmation email sent.",
+    devConfirmUrl: data.devConfirmUrl,
+    devConfirmCode: data.devConfirmCode,
+  };
+}
+
+// ---------- FACILITIES ----------
+
+export interface FacilityResponse {
+  facilityId: number;
+  name: string;
+  description?: string | null;
+}
+
+export async function listFacilities(): Promise<FacilityResponse[]> {
+  const { data } = await API.get<FacilityResponse[]>("/Facilities");
   return data;
 }
 
-// byEmail via query param (avoids '@' routing issues)
-export async function getUserByEmail(email: string): Promise<UserResponse> {
-  const { data } = await API.get<UserResponse>("/Users/byEmail", { params: { email } });
-  return data;
+// Forgot password
+export async function forgotPassword(payload: ForgotPasswordPayload): Promise<ForgotPasswordResponse> {
+  const { data } = await API.post("/Auth/forgotPassword", payload);
+  return {
+    message: data.message || "Password reset link sent to email.",
+    devToken: typeof data.devToken === "string" ? data.devToken : undefined,
+    devResetUrl: typeof data.devResetUrl === "string" ? data.devResetUrl : undefined,
+  };
 }
 
-// ---------- Desks ----------
+// Reset password
+export async function resetPassword(payload: ResetPasswordPayload): Promise<ResetPasswordResponse> {
+  const { data } = await API.post("/Auth/resetPassword", payload);
+  return {
+    message: data.message || "Password reset successful.",
+  };
+}
+
+// Get user details
+export async function getUserInfo(userId: number): Promise<UserResponse> {
+  const { data } = await API.get("/Auth/manage/info", { params: { userId } });
+  return {
+    userId: data.userId,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email,
+    emailConfirmed: data.emailConfirmed ?? data.confirmedEmail ?? false,
+    role: data.role ?? data.Role,
+  };
+}
+
+// Logout (dummy, no token yet)
+export async function logoutUser(): Promise<void> {
+  console.log("[api] logoutUser called – no token logic to clear.");
+}
+
+// ---------- DESKS ----------
+export interface DeskSummary {
+  deskId: number;
+  workspaceId: number;
+  deskCode: string;
+  isActive: boolean;
+  facilities?: string[];
+  status?: "MyReservation" | "Available" | "BookedByOthers" | "Unavailable";
+  workspaceName?: string | null;
+  focusMode?: string | null;
+  noiseLevel?: number | null;
+}
+
 export async function listDesks(): Promise<DeskSummary[]> {
   const { data } = await API.get<DeskSummary[]>("/Desks");
   return data;
 }
 
-// ---------- Bookings ----------
+// ---------- BOOKINGS ----------
+export interface BookingResponse {
+  bookingId: number;
+  userId: number;
+  deskId: number;
+  deskCode?: string | null;
+  bookingDate: string;
+  bookingStart: string;
+  bookingEnd: string;
+  status?: string | null;
+  created: string;
+  user?: UserResponse | null;
+}
+
+export interface BookingCreateRequest {
+  userId: number;
+  deskId: number;
+  bookingDate: string;
+  bookingStart: string;
+  bookingEnd: string;
+  status?: string | null;
+}
+
+export interface BookingCheckoutRequest {
+  performedByUserId: number;
+}
+
 export async function listBookings(): Promise<BookingResponse[]> {
   const { data } = await API.get<BookingResponse[]>("/Bookings");
   return data;
@@ -103,18 +275,82 @@ export async function createBooking(req: BookingCreateRequest): Promise<BookingR
   return data;
 }
 
+export async function checkoutBooking(
+  bookingId: number,
+  payload: BookingCheckoutRequest
+): Promise<BookingResponse> {
+  const { data } = await API.post<BookingResponse>(`/Bookings/${bookingId}/checkout`, payload);
+  return data;
+}
+
 export async function listUpcomingBookings(): Promise<BookingResponse[]> {
   const { data } = await API.get<BookingResponse[]>("/Bookings/upcoming");
   return data;
 }
 
-// 🔹 Notice: past bookings are audit logs
-export async function listPastBookings(): Promise<AuditLogResponse[]> {
-  const { data } = await API.get<AuditLogResponse[]>("/Bookings/past");
+export async function listPastBookings(): Promise<any[]> {
+  const { data } = await API.get<any[]>("/Bookings/past");
   return data;
 }
 
-// ---------- Audit Logs ----------
+// ---------- DESK SUGGESTIONS ----------
+
+export interface DeskSuggestionRequestPayload {
+  userId: number;
+  start: string;
+  end: string;
+  workspaceId?: number;
+  limit?: number;
+  prioritizeFocus?: boolean;
+  alignWithTeam?: boolean;
+  desiredFacilities?: string[];
+}
+
+export interface DeskSuggestionItem {
+  deskId: number;
+  deskCode: string;
+  workspaceId: number;
+  workspaceName?: string | null;
+  facilities: string[];
+  score: number;
+  reasons: string[];
+  confidence: number;
+  teammateCount: number;
+  teammateNames: string[];
+  focusMode?: string | null;
+  noiseLevel?: number | null;
+  focusMatch: boolean;
+  teamAlignmentMatch: boolean;
+}
+
+export interface DeskSuggestionResponsePayload {
+  userId: number;
+  requestedStart: string;
+  requestedEnd: string;
+  generatedAt: string;
+  suggestions: DeskSuggestionItem[];
+  teamName?: string | null;
+  teamPresenceCount: number;
+  teamPresenceSample: string[];
+  focusPreference?: string | null;
+  focusPreferenceInferred: boolean;
+}
+
+export async function fetchDeskSuggestions(
+  payload: DeskSuggestionRequestPayload
+): Promise<DeskSuggestionResponsePayload> {
+  const { data } = await API.post<DeskSuggestionResponsePayload>("/DeskSuggestions", payload);
+  return data;
+}
+
+// ---------- AUDIT LOGS ----------
+export interface AuditLogResponse {
+  logId: number;
+  userId: number;
+  action: string;
+  logTime: string;
+}
+
 export async function getAuditLogs(): Promise<AuditLogResponse[]> {
   const { data } = await API.get<AuditLogResponse[]>("/AuditLogs");
   return data;
