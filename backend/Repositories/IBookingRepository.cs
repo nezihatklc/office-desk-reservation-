@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
 using backend.Models;
 
 namespace backend.Repositories
@@ -14,5 +17,8 @@ namespace backend.Repositories
         Task<List<Booking>> GetByUserIdAsync(int userId);
         Task<List<Booking>> GetByDeskIdAsync(int deskId);
         Task<bool> HasOverlapAsync(int deskId, DateTime start, DateTime end);
+        Task<bool> UserHasOverlapAsync(int userId, DateTime start, DateTime end);
+
+        Task SetStatusAsync(Booking booking, string status, CancellationToken cancellationToken = default);
     }
 }
