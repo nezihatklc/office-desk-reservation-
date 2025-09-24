@@ -11,20 +11,37 @@ namespace backend.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTime>(
-                name: "booking_date",
-                table: "bookings",
-                type: "timestamp with time zone",
-                nullable: false,
-                defaultValueSql: "CURRENT_DATE");
+            migrationBuilder.Sql(
+                @"DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'bookings' AND column_name = 'booking_date'
+                    ) THEN
+                        ALTER TABLE bookings
+                        ADD COLUMN booking_date timestamp with time zone NOT NULL DEFAULT (CURRENT_DATE);
+                    END IF;
+                END
+                $$;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "booking_date",
-                table: "bookings");
+            migrationBuilder.Sql(
+                @"DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'bookings' AND column_name = 'booking_date'
+                    ) THEN
+                        ALTER TABLE bookings
+                        DROP COLUMN booking_date;
+                    END IF;
+                END
+                $$;");
         }
     }
 }
