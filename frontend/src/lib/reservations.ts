@@ -1,17 +1,30 @@
 // src/lib/reservations.ts
 
-import { createBooking, listBookings } from "./api";
-import type { BookingResponse, BookingCreateRequest, UserResponse } from "./api";
+import { checkoutBooking, createBooking, listBookings } from "./api";
+import type {
+  BookingResponse,
+  BookingCreateRequest,
+  BookingCheckoutRequest,
+  UserResponse,
+} from "./api";
 
-export type Reservation = BookingResponse & { user?: UserResponse };
+export type Reservation = Omit<BookingResponse, "user"> & {
+  user?: UserResponse | null;
+};
 
 // cache user lookups if needed in the future
 const userCache = new Map<number, UserResponse>();
 
 async function expandUser(b: BookingResponse): Promise<Reservation> {
+  if (b.user) {
+    userCache.set(b.userId, b.user);
+    return { ...b, user: b.user };
+  }
+
   if (userCache.has(b.userId)) {
     return { ...b, user: userCache.get(b.userId) };
   }
+
   return { ...b };
 }
 
@@ -49,6 +62,11 @@ export async function makeReservation(payload: {
   try {
     const res = await createBooking(req);
 
+    if (res.user) {
+      userCache.set(res.user.userId, res.user);
+      return { ...res, user: res.user };
+    }
+
     const cachedUser = userCache.get(payload.userId);
     if (cachedUser) {
       return { ...res, user: cachedUser };
@@ -59,6 +77,18 @@ export async function makeReservation(payload: {
     console.error("Failed to create booking:", err);
     throw err;
   }
+}
+
+export async function checkoutReservation(payload: {
+  bookingId: number;
+  performedByUserId: number;
+}): Promise<Reservation> {
+  const req: BookingCheckoutRequest = {
+    performedByUserId: payload.performedByUserId,
+  };
+
+  const res = await checkoutBooking(payload.bookingId, req);
+  return expandUser(res);
 }
 
 // Filters & helpers
