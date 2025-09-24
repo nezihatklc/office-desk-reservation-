@@ -1,4 +1,5 @@
 using backend.DTOs;
+using backend.Exceptions;
 using backend.Models;
 using backend.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +29,8 @@ namespace backend.Controllers
                 WorkspaceName = w.WorkspaceName,
                 FloorNumber = w.FloorNumber,
                 DeskCode = w.DeskCode,
-                Capacity=w.Capacity,
+                Capacity = w.Capacity,
+                TeamName = w.TeamName,
                 Created = w.Created
             });
 
@@ -39,18 +41,25 @@ namespace backend.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
-            var workspace = await _workspaceService.GetByIdAsync(id);
-            if (workspace == null) return NotFound();
-
-            return Ok(new WorkspaceResponseDto
+            try
             {
-                WorkspaceId = workspace.WorkspaceId,
-                WorkspaceName = workspace.WorkspaceName,
-                FloorNumber = workspace.FloorNumber,
-                DeskCode = workspace.DeskCode,
-                Capacity=workspace.Capacity,
-                Created = workspace.Created
-            });
+                var workspace = await _workspaceService.GetByIdAsync(id);
+
+                return Ok(new WorkspaceResponseDto
+                {
+                    WorkspaceId = workspace.WorkspaceId,
+                    WorkspaceName = workspace.WorkspaceName,
+                    FloorNumber = workspace.FloorNumber,
+                    DeskCode = workspace.DeskCode,
+                    Capacity = workspace.Capacity,
+                    TeamName = workspace.TeamName,
+                    Created = workspace.Created
+                });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
         }
 
         // CREATE
@@ -64,7 +73,8 @@ namespace backend.Controllers
                     WorkspaceName = dto.WorkspaceName,
                     FloorNumber = dto.FloorNumber,
                     DeskCode = dto.DeskCode,
-                    Capacity=dto.Capacity,
+                    Capacity = dto.Capacity,
+                    TeamName = NormalizeTeam(dto.TeamName),
                     Created = DateTime.UtcNow
                 };
 
@@ -76,7 +86,8 @@ namespace backend.Controllers
                     WorkspaceName = workspace.WorkspaceName,
                     FloorNumber = workspace.FloorNumber,
                     DeskCode = workspace.DeskCode,
-                    Capacity=workspace.Capacity,
+                    Capacity = workspace.Capacity,
+                    TeamName = workspace.TeamName,
                     Created = workspace.Created
                 });
             }
@@ -88,7 +99,58 @@ namespace backend.Controllers
                     nner = ex.InnerException?.Message
                 });
             }
-        } 
-        
+        }
+
+        // UPDATE
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, [FromBody] WorkspaceUpdateDto dto)
+        {
+            try
+            {
+                var workspace = await _workspaceService.GetByIdAsync(id);
+
+                if (!string.IsNullOrWhiteSpace(dto.WorkspaceName))
+                    workspace.WorkspaceName = dto.WorkspaceName.Trim();
+
+                if (!string.IsNullOrWhiteSpace(dto.FloorNumber))
+                    workspace.FloorNumber = dto.FloorNumber.Trim();
+
+                if (!string.IsNullOrWhiteSpace(dto.DeskCode))
+                    workspace.DeskCode = dto.DeskCode.Trim();
+
+                if (dto.Capacity is int capacity && capacity >= 0)
+                    workspace.Capacity = capacity;
+
+                if (dto.TeamName != null)
+                    workspace.TeamName = NormalizeTeam(dto.TeamName);
+
+                await _workspaceService.UpdateAsync(workspace);
+
+                return Ok(new WorkspaceResponseDto
+                {
+                    WorkspaceId = workspace.WorkspaceId,
+                    WorkspaceName = workspace.WorkspaceName,
+                    FloorNumber = workspace.FloorNumber,
+                    DeskCode = workspace.DeskCode,
+                    Capacity = workspace.Capacity,
+                    TeamName = workspace.TeamName,
+                    Created = workspace.Created
+                });
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
+        private static string? NormalizeTeam(string? teamName)
+        {
+            if (string.IsNullOrWhiteSpace(teamName))
+                return null;
+
+            var trimmed = teamName.Trim();
+            return trimmed.Length == 0 ? null : trimmed;
+        }
+
     }
 }
