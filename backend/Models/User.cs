@@ -37,13 +37,25 @@ public class User
     [Column("confirmed_email_token")]
     public string? ConfirmedEmailToken { get; set; }
 
+    [Column("confirmed_email_code", TypeName = "varchar(6)")]
+    public string? ConfirmedEmailCode { get; set; }
+
+    [Column("confirmed_email_code_expiry", TypeName = "timestamptz")]
+    public DateTime? ConfirmedEmailCodeExpiry { get; set; }
+
+    [Column("team_name")]
+    [StringLength(100)]
+    public string? TeamName { get; set; }
+
+    [Column("preferred_focus_mode")]
+    [StringLength(40)]
+    public string? PreferredFocusMode { get; set; }
+
     [Column("reset_password_token",  TypeName = "varchar(250)")]
     public string? ResetPasswordToken { get; set; }
 
     [Column("reset_password_expiry", TypeName = "timestamptz")]
     public DateTime? ResetPasswordExpiry { get; set; }
-
-
     public virtual ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 
     public virtual ICollection<Booking> Bookings { get; set; } = new List<Booking>();
