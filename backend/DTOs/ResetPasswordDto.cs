@@ -9,6 +9,6 @@ public class ResetPasswordDto
     public string ResetToken { get; set; }
     
     [Required(ErrorMessage = "New password is require to login.")]
-    [MinLength(8,ErrorMessage = "New password must be at least 8 characters long and contains a letter and a number.")]
+    [MinLength(8, ErrorMessage = "New password must be at least 8 characters long.")]
     public string NewPassword { get; set; }
 }
