@@ -17,19 +17,28 @@ namespace backend.Repositories
             await _context.Desks
                 .Include(d => d.DeskFacilities)
                 .ThenInclude(df => df.Facility)
+                .Include(d => d.Workspace)
                 .ToListAsync();
 
         public async Task<Desk?> GetByIdAsync(int id) =>
             await _context.Desks
                 .Include(d => d.DeskFacilities)
                 .ThenInclude(df => df.Facility)
+                .Include(d => d.Workspace)
                 .FirstOrDefaultAsync(d => d.DeskId == id);
 
-        public async Task AddAsync(Desk desk)
-        {
+        public async Task<Desk> AddAsync(Desk desk)
+{
+            var exists = await _context.Desks
+            .AnyAsync(d => d.DeskCode == desk.DeskCode);
+
+            if (exists)
+                throw new InvalidOperationException($"Desk code {desk.DeskCode} already exists.");
+
             _context.Desks.Add(desk);
-            await _context.SaveChangesAsync();
-        }
+             await _context.SaveChangesAsync();
+            return desk;
+}
 
         public async Task UpdateAsync(Desk desk)
         {
