@@ -10,5 +10,6 @@ namespace backend.Repositories
         Task AddAsync(User user);
         Task UpdateAsync(User user);
         Task DeleteAsync(int id);
+        Task<List<User>> GetByTeamAsync(string teamName);
     }
 }
