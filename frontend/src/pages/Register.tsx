@@ -1,15 +1,18 @@
+// src/pages/Register.tsx
+
 import React, { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { registerUser } from "../lib/api"; 
-// Simple email regex for demo-level validation
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+
+// Simple email regex
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Password rules
 function validatePassword(pw: string) {
   const minLen = pw.length >= 8;
-  const hasLetter = /[A-Za-z]/.test(pw);
+  const hasUpper = /[A-Z]/.test(pw);
   const hasNumber = /\d/.test(pw);
-  return { minLen, hasLetter, hasNumber, ok: minLen && hasLetter && hasNumber };
+  return { minLen, hasUpper, hasNumber, ok: minLen && hasUpper && hasNumber };
 }
 
 export default function Register() {
@@ -19,6 +22,11 @@ export default function Register() {
   const [password, setPassword]   = useState("");
   const [confirm, setConfirm]     = useState("");
   const [accepted, setAccepted]   = useState(false);
+  const [error, setError]         = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const nav = useNavigate();
+  const { register } = useAuth();
 
   const emailValid   = emailRegex.test(email);
   const pw           = useMemo(() => validatePassword(password), [password]);
@@ -34,25 +42,63 @@ export default function Register() {
     confirmValid &&
     accepted;
 
-    async function handleSubmit(e: React.FormEvent) {
-      e.preventDefault(); // stops GET /register reload
-      if (!formValid) return;
-    
-      try {
-        const response = await registerUser({
-          firstName,
-          lastName,
-          email,
-          password,
-        });
-        console.log("Backend response:", response);
-        alert("Registration successful!");
-      } catch (err: any) {
-        console.error("Backend error:", err);
-        alert(`Registration failed: ${err.message || "Unknown error"}`);
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!formValid) return;
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const trimmedFirst = firstName.trim();
+      const trimmedLast = lastName.trim();
+      const trimmedEmail = email.trim();
+
+      const { error: registerError, confirmUrl, confirmCode } = await register(
+        trimmedFirst,
+        trimmedLast,
+        trimmedEmail,
+        password
+      );
+
+      if (registerError) {
+        setError(registerError);
+      } else if (confirmUrl) {
+        try {
+          const url = new URL(confirmUrl);
+          const tokenParam = url.searchParams.get("token");
+          const emailParam = url.searchParams.get("email") ?? trimmedEmail;
+
+          if (tokenParam && emailParam) {
+            const params = new URLSearchParams({
+              token: tokenParam,
+              email: emailParam,
+            });
+
+            if (confirmCode) {
+              params.set("prefillCode", confirmCode);
+            }
+
+            nav(`/confirm-email?${params.toString()}`, { replace: true });
+          } else {
+            nav("/confirm-email-pending", { state: { email: trimmedEmail, confirmCode } });
+          }
+        } catch (parseErr) {
+          console.warn("Failed to parse confirmation URL", parseErr);
+          nav("/confirm-email-pending", { state: { email: trimmedEmail, confirmCode } });
+        }
+      } else {
+        nav("/confirm-email-pending", { state: { email: trimmedEmail, confirmCode } });
       }
+    } catch (err: any) {
+      console.error("Registration failed:", err);
+      const backendMsg =
+        err?.response?.data?.error || err?.response?.data?.message;
+      setError(backendMsg || err?.message || "Registration failed.");
+    } finally {
+      setIsLoading(false);
     }
-    
+  }
 
   return (
     <div className="auth-page">
@@ -129,14 +175,14 @@ export default function Register() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 8 characters with letters & numbers"
+              placeholder="At least 8 characters, uppercase & number"
               required
               minLength={8}
               autoComplete="new-password"
             />
             <div className="hints">
               <div className={pw.minLen ? "hint-ok" : "hint-bad"}>• At least 8 characters</div>
-              <div className={pw.hasLetter ? "hint-ok" : "hint-bad"}>• Contains a letter</div>
+              <div className={pw.hasUpper ? "hint-ok" : "hint-bad"}>• Contains an uppercase letter</div>
               <div className={pw.hasNumber ? "hint-ok" : "hint-bad"}>• Contains a number</div>
             </div>
           </div>
@@ -170,19 +216,24 @@ export default function Register() {
                 aria-label="Accept the Terms and Conditions"
                 style={{marginTop: 4}}
               />
-              <span>
+              <span style={{ color: "#1f2937" }}>
                 I accept the Terms and Conditions{" "}
                 <Link to="/terms" className="link">(Read)</Link>
               </span>
             </span>
           </label>
 
-          <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={!formValid}>
-            Sign Up
+          {/* Error */}
+          {error && <p className="error-text">{error}</p>}
+
+          <button
+            type="submit"
+            className="btn btn-primary btn-block btn-lg"
+            disabled={!formValid || isLoading}
+          >
+            {isLoading ? "Creating..." : "Sign Up"}
           </button>
         </form>
-
-        
       </div>
     </div>
   );
