@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import {
   listUpcomingBookings,
@@ -56,100 +56,142 @@ export default function ProfilePage() {
   }
 
   const list = tab === "upcoming" ? upcoming : past;
+  const upcomingCount = upcoming.length;
+  const pastCount = past.length;
+
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+  const formatTimeRange = (startISO: string, endISO: string) =>
+    `${new Date(startISO).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })} – ${new Date(endISO).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`;
 
   return (
-    <div className="container">
-      <div className="panel-glass card">
-        <h1 className="auth-title" style={{ textAlign: "left" }}>My Reservations</h1>
-        <p className="muted" style={{ marginBottom: 12 }}>
-          Signed in as {email || "Guest"}
-        </p>
+    <div className="page-shell profile-page">
+      <section className="panel-glass profile-card">
+        <header className="profile-header">
+          <div className="profile-heading">
+            <h1>My Reservations</h1>
+            <p className="muted">Signed in as {email || "Guest"}</p>
+          </div>
+          <div className="profile-summary" aria-label="Reservation counts">
+            <ProfileStat label="Upcoming" value={upcomingCount} accent="mine" />
+            <ProfileStat label="History" value={pastCount} accent="available" />
+          </div>
+        </header>
 
-        {/* Tabs */}
-        <div className="row" style={{ marginBottom: 12 }}>
+        <div className="profile-tabs" role="tablist">
           <button
-            className={`btn ${tab === "upcoming" ? "btn-primary" : "btn-ghost"}`}
+            className={`profile-tab${tab === "upcoming" ? " active" : ""}`}
+            type="button"
             onClick={() => setTab("upcoming")}
+            role="tab"
+            aria-selected={tab === "upcoming"}
           >
             Upcoming
           </button>
           <button
-            className={`btn ${tab === "past" ? "btn-primary" : "btn-ghost"}`}
+            className={`profile-tab${tab === "past" ? " active" : ""}`}
+            type="button"
             onClick={() => setTab("past")}
+            role="tab"
+            aria-selected={tab === "past"}
           >
             Past
           </button>
         </div>
 
-        {/* Empty state */}
         {list.length === 0 ? (
-          <div className="panel-dark" role="status" aria-live="polite">
-            You have no {tab} reservations.
+          <div className="panel-dark empty-state" role="status" aria-live="polite">
+            {tab === "upcoming"
+              ? "You have no upcoming reservations."
+              : "No reservation history yet."}
           </div>
         ) : (
-          <div className="col" style={{ gap: 12 }}>
-            {tab === "upcoming" &&
-              upcoming.map((r) => (
-                <div
-                  key={r.bookingId}
-                  className="panel-glass"
-                  style={{ display: "grid", gap: 8 }}
-                >
-                  <div className="row" style={{ justifyContent: "space-between" }}>
-                    <strong>Desk #{r.deskId}</strong>
-                    <span className="badge">{r.status}</span>
-                  </div>
-                  <div className="row" style={{ flexWrap: "wrap" }}>
-                    <div>
-                      <span className="label">Date</span>
-                      <p>{new Date(r.bookingDate).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <span className="label" style={{ marginLeft: 16 }}>Time</span>
-                      <p>
-                        {new Date(r.bookingStart).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })} –{" "}
-                        {new Date(r.bookingEnd).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* 🔹 Cancel button */}
-                  <button
-                    className="btn btn-danger"
-                    onClick={() => cancelBooking(r.bookingId)}
-                    disabled={loading}
-                  >
-                    {loading ? "Cancelling..." : "Cancel"}
-                  </button>
-                </div>
-              ))}
-
-            {tab === "past" &&
-              past.map((log) => (
-                <div
-                  key={log.logId}
-                  className="panel-glass"
-                  style={{ display: "grid", gap: 8 }}
-                >
-                  <div className="row" style={{ justifyContent: "space-between" }}>
-                    <strong>Action:</strong>
-                    <span className="badge">{log.action}</span>
-                  </div>
-                  <div>
-                    <span className="label">Date</span>
-                    <p>{new Date(log.logTime).toLocaleString()}</p>
-                  </div>
-                </div>
-              ))}
+          <div className="profile-reservations">
+            {tab === "upcoming"
+              ? upcoming.map((r) => (
+                  <article key={r.bookingId} className="reservation-card" aria-label={`Desk ${r.deskId} reservation`}>
+                    <header className="reservation-card__header">
+                      <div>
+                        <span className="reservation-card__desk">{r.deskCode ?? `Desk #${r.deskId}`}</span>
+                      </div>
+                      <span className="reservation-card__status">{r.status ?? "Confirmed"}</span>
+                    </header>
+                    <dl className="reservation-card__details">
+                      <div>
+                        <dt>Date</dt>
+                        <dd>{formatDate(r.bookingDate)}</dd>
+                      </div>
+                      <div>
+                        <dt>Time</dt>
+                        <dd>{formatTimeRange(r.bookingStart, r.bookingEnd)}</dd>
+                      </div>
+                    </dl>
+                    <footer className="reservation-card__footer">
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => cancelBooking(r.bookingId)}
+                        disabled={loading}
+                      >
+                        {loading ? "Cancelling…" : "Cancel reservation"}
+                      </button>
+                    </footer>
+                  </article>
+                ))
+              : past.map((log) => (
+                  <article key={log.logId} className="reservation-card" aria-label={`Audit log ${log.logId}`}>
+                    <header className="reservation-card__header">
+                      <div>
+                        <span className="reservation-card__desk">{log.action}</span>
+                      </div>
+                      <span className="reservation-card__status reservation-card__status--neutral">History</span>
+                    </header>
+                    <dl className="reservation-card__details">
+                      <div>
+                        <dt>Date</dt>
+                        <dd>{formatDate(log.logTime)}</dd>
+                      </div>
+                      <div>
+                        <dt>Time</dt>
+                        <dd>
+                          {new Date(log.logTime).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
           </div>
         )}
-      </div>
+      </section>
+    </div>
+  );
+}
+
+type ProfileStatProps = {
+  label: string;
+  value: number;
+  accent?: "mine" | "available";
+};
+
+function ProfileStat({ label, value, accent }: ProfileStatProps) {
+  return (
+    <div className={`profile-stat${accent ? ` profile-stat--${accent}` : ""}`}>
+      <span className="profile-stat__value">{value}</span>
+      <span className="profile-stat__label">{label}</span>
     </div>
   );
 }
