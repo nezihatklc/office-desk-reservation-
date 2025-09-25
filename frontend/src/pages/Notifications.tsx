@@ -334,12 +334,7 @@ export default function NotificationsPage() {
                       <div className="notification-body">
                         <div className="notification-title-row">
                           <span className="notification-title">{item.title}</span>
-                          <time dateTime={item.timestamp}>
-                            {new Date(item.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </time>
+                          <time dateTime={item.timestamp}>{isoToHHMMInTR(item.timestamp)}</time>
                         </div>
                         <p>{item.message}</p>
                       </div>
