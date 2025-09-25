@@ -501,6 +501,17 @@ aside.col { gap: 18px !important; }
   gap: 2px;
 }
 
+.today-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.today-card__status {
+  font-size: 0.875rem;
+  color: var(--colors-secondary-main);
+}
+
+.today-card__checkin,
 .today-card__checkout {
   white-space: nowrap;
   padding-inline: 0.75rem;
@@ -2489,6 +2500,44 @@ aside.col { gap: 18px !important; }
 
 .admin-bookings tbody tr:hover {
   background: rgba(73, 162, 223, 0.12);
+}
+
+.admin-bookings__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  background: rgba(16, 32, 52, 0.12);
+  color: #102034;
+  text-transform: capitalize;
+}
+
+.admin-bookings__status[data-status="checkedin"] {
+  background: rgba(34, 197, 94, 0.18);
+  color: #0f5132;
+}
+
+.admin-bookings__status[data-status="checkedout"] {
+  background: rgba(59, 130, 246, 0.18);
+  color: #1d4ed8;
+}
+
+.admin-bookings__status[data-status="pending"] {
+  background: rgba(249, 115, 22, 0.18);
+  color: #7c2d12;
+}
+
+.admin-bookings__status[data-status="cancelled"] {
+  background: rgba(239, 68, 68, 0.2);
+  color: #991b1b;
+}
+
+.admin-bookings__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 /* ===== Notifications ===== */
