@@ -182,6 +182,36 @@ namespace backend.Controllers
                 return NoContent();
             }
 
+        // === CHECK IN BOOKING ===
+        [HttpPost("{id}/checkin")]
+        [ProducesResponseType(typeof(BookingResponse), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(403)]
+        [ProducesResponseType(404)]
+        public async Task<IActionResult> Checkin(int id, [FromBody] BookingCheckinRequest request)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            try
+            {
+                var booking = await _bookingService.CheckInAsync(id, request.PerformedByUserId);
+                return Ok(ToResponse(booking));
+            }
+            catch (NotFoundException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         // === CHECK OUT BOOKING ===
         [HttpPost("{id}/checkout")]
         [ProducesResponseType(typeof(BookingResponse), 200)]
