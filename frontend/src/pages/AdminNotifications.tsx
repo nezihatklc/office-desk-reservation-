@@ -133,6 +133,21 @@ function parseCheckoutDetails(action: string): CancellationDetails | null {
   return { bookingId, deskId };
 }
 
+function isCheckinLog(action: string | undefined | null): boolean {
+  if (!action) return false;
+  return /checked in booking\s+\d+/i.test(action) && /\(desk\s+\d+/i.test(action);
+}
+
+function parseCheckinDetails(action: string): CancellationDetails | null {
+  const match = action.match(/checked in booking\s+(\d+)\s*\(desk\s+(\d+)\)/i);
+  if (!match) return null;
+  const [, bookingIdStr, deskIdStr] = match;
+  const bookingId = Number.parseInt(bookingIdStr, 10);
+  const deskId = Number.parseInt(deskIdStr, 10);
+  if (Number.isNaN(bookingId) || Number.isNaN(deskId)) return null;
+  return { bookingId, deskId };
+}
+
 function formatHeading(date: Date): string {
   const today = new Date();
   const startOfDay = (value: Date) => {
@@ -275,7 +290,8 @@ export default function AdminNotifications() {
 
         const cancellationLogs = auditLogData.filter((log) => isDetailedCancellation(log.action));
         const checkoutLogs = auditLogData.filter((log) => isCheckoutLog(log.action));
-        const relevantLogs = [...cancellationLogs, ...checkoutLogs];
+        const checkinLogs = auditLogData.filter((log) => isCheckinLog(log.action));
+        const relevantLogs = [...cancellationLogs, ...checkoutLogs, ...checkinLogs];
         const missingUserIds = Array.from(
           new Set(
             relevantLogs
@@ -429,6 +445,50 @@ export default function AdminNotifications() {
         )}`,
         timestamp: cancelledAt.toISOString(),
         severity: "warning",
+      });
+    });
+
+    const checkinLogs = auditLogs
+      .filter((log) => isCheckinLog(log.action))
+      .sort((a, b) => new Date(b.logTime).getTime() - new Date(a.logTime).getTime())
+      .slice(0, 30);
+
+    checkinLogs.forEach((log) => {
+      if (!log.action) return;
+      const details = parseCheckinDetails(log.action);
+      if (!details) return;
+
+      const booking = reservations.find((reservation) => reservation.bookingId === details.bookingId);
+      const desk = booking ? deskById.get(booking.deskId) : deskById.get(details.deskId);
+      const deskLabel = booking?.deskCode ?? desk?.deskCode ?? `Desk #${details.deskId}`;
+
+      const actor = typeof log.userId === "number" ? userLookup[log.userId] : undefined;
+      const actorName = actor
+        ? `${actor.firstName ?? ""} ${actor.lastName ?? ""}`.trim()
+        : typeof log.userId === "number"
+          ? `User #${log.userId}`
+          : "System";
+
+      const occupantUser = booking?.user ?? (booking ? userLookup[booking.userId] : undefined);
+      const occupantName = occupantUser
+        ? `${occupantUser.firstName ?? ""} ${occupantUser.lastName ?? ""}`.trim()
+        : booking
+          ? `User #${booking.userId}`
+          : undefined;
+
+      const checkinDate = new Date(log.logTime);
+      const checkinValid = !Number.isNaN(checkinDate.getTime());
+      const checkinTimestamp = checkinValid ? checkinDate.toISOString() : new Date().toISOString();
+      const timeLabel = checkinValid ? ` at ${isoToHHMMInTR(checkinTimestamp)}` : "";
+
+      const occupantSuffix = occupantName ? ` · Reservation by ${occupantName}` : "";
+
+      notificationsList.push({
+        id: `checkin-${log.logId}`,
+        title: `${deskLabel} checked in`,
+        message: `${actorName || "User"} checked in${timeLabel}${occupantSuffix}.`,
+        timestamp: checkinTimestamp,
+        severity: "info",
       });
     });
 
@@ -743,12 +803,7 @@ export default function AdminNotifications() {
                       <div className="notification-body">
                         <div className="notification-title-row">
                           <span className="notification-title">{item.title}</span>
-                          <time dateTime={item.timestamp}>
-                            {new Date(item.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </time>
+                          <time dateTime={item.timestamp}>{isoToHHMMInTR(item.timestamp)}</time>
                         </div>
                         <p>{item.message}</p>
                       </div>
