@@ -24,6 +24,7 @@ import {
   generateDeskLayout,
   isoToHHMMInTR,
   isoDateKeyInTR,
+  formatDateInTR,
   normalizeDeskCode,
   workspaceFromDesk,
   mapDeskStatus,
@@ -101,6 +102,7 @@ export default function Admin() {
   const [checkoutBusyId, setCheckoutBusyId] = useState<number | null>(null);
   const [confirmAction, setConfirmAction] = useState<AdminConfirmAction | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [banner, setBanner] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   const baseLayout = useMemo(generateDeskLayout, []);
   const todayKey = useMemo(() => isoDateKeyInTR(new Date().toISOString()), []);
@@ -150,6 +152,12 @@ export default function Admin() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!banner) return;
+    const timer = window.setTimeout(() => setBanner(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [banner]);
 
   const deskByCode = useMemo(() => {
     const map = new Map<string, DeskSummary>();
@@ -232,6 +240,40 @@ export default function Admin() {
 
     return map;
   }, [reservations, date]);
+
+  const todaysReservations = useMemo(
+    () => reservations.filter((reservation) => isoDateKeyInTR(reservation.bookingStart) === todayKey),
+    [reservations, todayKey]
+  );
+
+  const attendanceSummary = useMemo(() => {
+    const total = todaysReservations.length;
+    let checkedIn = 0;
+    let checkedOut = 0;
+    let pending = 0;
+
+    todaysReservations.forEach((reservation) => {
+      const status = reservation.status?.trim().toLowerCase();
+      if (status === "checkedin") checkedIn += 1;
+      else if (status === "checkedout") checkedOut += 1;
+      else pending += 1;
+    });
+
+    return { total, checkedIn, checkedOut, pending };
+  }, [todaysReservations]);
+
+  const overdueCheckins = useMemo(() => {
+    const now = Date.now();
+    return todaysReservations
+      .filter((reservation) => {
+        const status = reservation.status?.trim().toLowerCase();
+        if (status === "checkedin" || status === "checkedout") return false;
+        const startTime = new Date(reservation.bookingStart).getTime();
+        if (Number.isNaN(startTime)) return false;
+        return startTime < now;
+      })
+      .sort((a, b) => a.bookingStart.localeCompare(b.bookingStart));
+  }, [todaysReservations]);
 
   const workspaceHeat = useMemo(() => {
     const cutoff = new Date();
@@ -395,6 +437,9 @@ export default function Admin() {
         });
 
         applyReservationUpdate(updated);
+        const deskLabel =
+          updated.deskCode ?? deskById.get(updated.deskId)?.deskCode ?? `Desk ${updated.deskId}`;
+        setBanner({ tone: "success", text: `Checked in to ${deskLabel}.` });
       } catch (err) {
         console.error("Admin check-in failed", err);
         const fallbackMessage = "Failed to check in. Please try again.";
@@ -408,7 +453,7 @@ export default function Admin() {
         setCheckinBusyId(null);
       }
     },
-    [applyReservationUpdate, setError, user]
+    [applyReservationUpdate, deskById, setError, user]
   );
 
   const performCheckout = useCallback(
@@ -425,6 +470,9 @@ export default function Admin() {
         });
 
         applyReservationUpdate(updated);
+        const deskLabel =
+          updated.deskCode ?? deskById.get(updated.deskId)?.deskCode ?? `Desk ${updated.deskId}`;
+        setBanner({ tone: "success", text: `Checked out of ${deskLabel}.` });
       } catch (err) {
         console.error("Admin checkout failed", err);
         const fallbackMessage = "Failed to check out. Please try again.";
@@ -442,7 +490,7 @@ export default function Admin() {
         setCheckoutBusyId(null);
       }
     },
-    [applyReservationUpdate, setError, user]
+    [applyReservationUpdate, deskById, setError, user]
   );
 
   const handleConfirmAction = useCallback(async () => {
@@ -745,6 +793,73 @@ export default function Admin() {
         {metricCards.map((metric) => (
           <MetricCard key={metric.label} {...metric} />
         ))}
+      </section>
+
+      {banner && (
+        <div
+          className={`admin-inline-banner admin-inline-banner--${banner.tone}`}
+          role="status"
+          aria-live="polite"
+        >
+          {banner.text}
+        </div>
+      )}
+
+      <section className="admin-section">
+        <div className="panel-glass admin-attendance">
+          <div className="admin-panel-header">
+            <h2>Attendance snapshot</h2>
+            <span className="muted">Live view for {formatDateInTR(new Date().toISOString())}</span>
+          </div>
+
+          <div className="attendance-summary">
+            <div>
+              <span className="label">Booked desks</span>
+              <strong>{attendanceSummary.total}</strong>
+            </div>
+            <div>
+              <span className="label">Checked in</span>
+              <strong>{attendanceSummary.checkedIn}</strong>
+            </div>
+            <div>
+              <span className="label">Checked out</span>
+              <strong>{attendanceSummary.checkedOut}</strong>
+            </div>
+            <div>
+              <span className="label">Awaiting arrival</span>
+              <strong>{attendanceSummary.pending}</strong>
+            </div>
+          </div>
+
+          <div className="attendance-overdue">
+            <h3>Overdue check-ins</h3>
+            {overdueCheckins.length === 0 ? (
+              <p className="muted">Everyone scheduled so far has checked in.</p>
+            ) : (
+              <ul>
+                {overdueCheckins.map((reservation) => {
+                  const deskLabel =
+                    reservation.deskCode ?? deskById.get(reservation.deskId)?.deskCode ?? `Desk ${reservation.deskId}`;
+                  const occupantLabel = reservation.user
+                    ? `${reservation.user.firstName} ${reservation.user.lastName}`.trim()
+                    : `User #${reservation.userId}`;
+                  return (
+                    <li key={reservation.bookingId}>
+                      <div className="primary">
+                        <strong>{deskLabel}</strong>
+                        <span>{isoToHHMMInTR(reservation.bookingStart)} – {isoToHHMMInTR(reservation.bookingEnd)}</span>
+                      </div>
+                      <div className="secondary">
+                        <span>{occupantLabel}</span>
+                        <span>Start passed — tap actions to follow up.</span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
       </section>
 
       <section className="admin-section">
@@ -1109,6 +1224,9 @@ export default function Admin() {
                             {checkoutLabel}
                           </button>
                         </div>
+                        {!isReservationToday && (
+                          <p className="admin-bookings__hint">Actions unlock on the reservation day (TR time).</p>
+                        )}
                       </td>
                     </tr>
                   );
