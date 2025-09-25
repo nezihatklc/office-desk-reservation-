@@ -91,6 +91,22 @@ export function isoDateKeyInTR(iso: string | null | undefined): string {
   }).format(dt);
 }
 
+export function formatDateInTR(
+  iso: string,
+  options: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  }
+): string {
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: ISTANBUL_TZ,
+    ...options,
+  }).format(dt);
+}
+
 export function normalizeDeskCode(code?: string | null): string {
   if (!code) return "";
 
