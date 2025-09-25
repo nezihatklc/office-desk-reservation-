@@ -140,6 +140,57 @@ namespace backend.Services
             return allBookings.Where(b => b.UserId != userId).ToList();
         }
 
+        public async Task<Booking> CheckInAsync(int bookingId, int performedByUserId, CancellationToken cancellationToken = default)
+        {
+            var booking = await _bookingRepository.GetByIdAsync(bookingId)
+                ?? throw new NotFoundException($"Booking {bookingId} not found.");
+
+            if (booking.Status != null && string.Equals(booking.Status, "CheckedOut", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("This booking is already checked out and cannot be checked in again.");
+            }
+
+            if (booking.Status != null && string.Equals(booking.Status, "CheckedIn", StringComparison.OrdinalIgnoreCase))
+            {
+                return booking;
+            }
+
+            var actor = await _userRepository.GetByIdAsync(performedByUserId)
+                ?? throw new NotFoundException($"User {performedByUserId} not found.");
+
+            var isOwner = booking.UserId == performedByUserId;
+            var isAdmin = !string.IsNullOrWhiteSpace(actor.Role) &&
+                string.Equals(actor.Role, "Admin", StringComparison.OrdinalIgnoreCase);
+
+            if (!isOwner && !isAdmin)
+                throw new UnauthorizedAccessException("You are not allowed to check in this booking.");
+
+            var bookingStartUtc = NormalizeToUtc(booking.BookingStart);
+            var bookingEndUtc = NormalizeToUtc(booking.BookingEnd);
+            var nowUtc = DateTime.UtcNow;
+
+            if (bookingStartUtc.Date != nowUtc.Date)
+                throw new InvalidOperationException("You can only check in on the reservation day.");
+
+            if (nowUtc < bookingStartUtc.AddMinutes(-30))
+                throw new InvalidOperationException("You can only check in up to 30 minutes before your reservation starts.");
+
+            if (nowUtc > bookingEndUtc)
+                throw new InvalidOperationException("This reservation already ended. Please contact an administrator.");
+
+            await _bookingRepository.SetStatusAsync(booking, "CheckedIn", cancellationToken);
+
+            await _auditLogService.AddAsync(new AuditLog
+            {
+                UserId = performedByUserId,
+                Action = $"Checked in booking {booking.BookingId} (Desk {booking.DeskId})",
+                LogTime = DateTime.UtcNow
+            });
+
+            booking.Status = "CheckedIn";
+            return booking;
+        }
+
         public async Task<Booking> CheckoutAsync(int bookingId, int performedByUserId, CancellationToken cancellationToken = default)
         {
             var booking = await _bookingRepository.GetByIdAsync(bookingId)
@@ -160,6 +211,16 @@ namespace backend.Services
             if (!isOwner && !isAdmin)
                 throw new UnauthorizedAccessException("You are not allowed to check out this booking.");
 
+            var bookingStartUtc = NormalizeToUtc(booking.BookingStart);
+            var bookingEndUtc = NormalizeToUtc(booking.BookingEnd);
+            var nowUtc = DateTime.UtcNow;
+
+            if (bookingStartUtc.Date != nowUtc.Date)
+                throw new InvalidOperationException("You can only check out on the reservation day.");
+
+            if (nowUtc < bookingStartUtc)
+                throw new InvalidOperationException("You cannot check out before the reservation starts.");
+
             await _bookingRepository.SetStatusAsync(booking, "CheckedOut", cancellationToken);
 
             await _auditLogService.AddAsync(new AuditLog
@@ -172,5 +233,12 @@ namespace backend.Services
             booking.Status = "CheckedOut";
             return booking;
         }
+
+        private static DateTime NormalizeToUtc(DateTime value) => value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
     }
 }
