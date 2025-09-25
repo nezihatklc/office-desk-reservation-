@@ -7,6 +7,7 @@ import {
   type AuditLogResponse,
 } from "../lib/api";
 import API from "../lib/api"; // 🔹 import axios instance for DELETE
+import { isoToHHMMInTR } from "../lib/floorUtils";
 
 type TabKey = "upcoming" | "past";
 
@@ -60,21 +61,16 @@ export default function ProfilePage() {
   const pastCount = past.length;
 
   const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString("en-US", {
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Istanbul",
       weekday: "short",
       month: "short",
       day: "numeric",
       year: "numeric",
-    });
+    }).format(new Date(iso));
 
   const formatTimeRange = (startISO: string, endISO: string) =>
-    `${new Date(startISO).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })} – ${new Date(endISO).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
+    `${isoToHHMMInTR(startISO)} – ${isoToHHMMInTR(endISO)}`;
 
   return (
     <div className="page-shell profile-page">
@@ -165,10 +161,7 @@ export default function ProfilePage() {
                       <div>
                         <dt>Time</dt>
                         <dd>
-                          {new Date(log.logTime).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {isoToHHMMInTR(log.logTime)}
                         </dd>
                       </div>
                     </dl>
