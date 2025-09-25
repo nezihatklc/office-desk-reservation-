@@ -1,5 +1,7 @@
 import type { DeskStatus, LegendKey } from "../components/FloorPlan";
 
+const ISTANBUL_TZ = "Europe/Istanbul";
+
 export const WORKSPACES = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
 export const HEATMAP_LOOKBACK_DAYS = 7;
 
@@ -70,10 +72,22 @@ export function toMinutes(hhmm: string): number {
 export function isoToHHMMInTR(iso: string): string {
   const dt = new Date(iso);
   return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Istanbul",
+    timeZone: ISTANBUL_TZ,
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+  }).format(dt);
+}
+
+export function isoDateKeyInTR(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: ISTANBUL_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(dt);
 }
 
