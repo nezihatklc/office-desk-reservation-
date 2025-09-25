@@ -1,10 +1,11 @@
 // src/lib/reservations.ts
 
-import { checkoutBooking, createBooking, listBookings } from "./api";
+import { checkinBooking, checkoutBooking, createBooking, listBookings } from "./api";
 import type {
   BookingResponse,
   BookingCreateRequest,
   BookingCheckoutRequest,
+  BookingCheckinRequest,
   UserResponse,
 } from "./api";
 
@@ -88,6 +89,18 @@ export async function checkoutReservation(payload: {
   };
 
   const res = await checkoutBooking(payload.bookingId, req);
+  return expandUser(res);
+}
+
+export async function checkinReservation(payload: {
+  bookingId: number;
+  performedByUserId: number;
+}): Promise<Reservation> {
+  const req: BookingCheckinRequest = {
+    performedByUserId: payload.performedByUserId,
+  };
+
+  const res = await checkinBooking(payload.bookingId, req);
   return expandUser(res);
 }
 
