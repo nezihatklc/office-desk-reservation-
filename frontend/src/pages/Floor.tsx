@@ -26,6 +26,7 @@ import {
   toMinutes,
   isoToHHMMInTR,
   isoDateKeyInTR,
+  formatDateInTR,
   normalizeDeskCode,
   mapDeskStatus,
   describeFacility,
@@ -1235,6 +1236,8 @@ export default function Floor() {
                 switch (normalizedStatus) {
                   case "checkedin":
                     return "Checked in";
+                  case "checkedout":
+                    return "Checked out";
                   case "confirmed":
                     return "Confirmed";
                   case "pending":
@@ -1260,6 +1263,19 @@ export default function Floor() {
               const checkoutTitle = checkoutDisabled && !isReservationToday
                 ? "Check-out is only available on the reservation day."
                 : undefined;
+              const actionMessage = (() => {
+                if (!isReservationToday) {
+                  const dayLabel = formatDateInTR(reservation.bookingStart);
+                  return `Actions unlock ${dayLabel} at ${isoToHHMMInTR(reservation.bookingStart)} (TR time).`;
+                }
+                if (normalizedStatus === "checkedout") {
+                  return "This reservation is already checked out.";
+                }
+                if (normalizedStatus === "checkedin") {
+                  return "Checked in – have a great day on site.";
+                }
+                return "Check in on arrival so colleagues see this desk in use.";
+              })();
 
               return (
                 <div key={key} className="today-card__entry">
@@ -1270,29 +1286,34 @@ export default function Floor() {
                     </span>
                     {statusLabel && <span className="today-card__status">{statusLabel}</span>}
                   </div>
-                  <div className="today-card__actions">
-                    <button
-                      type="button"
-                      className="btn btn-ghost today-card__checkin"
-                      onClick={() => requestCheckin(reservation)}
-                      disabled={checkinDisabled}
-                      title={checkinTitle}
-                    >
-                      {isCheckinBusy
-                        ? "Checking in…"
-                        : normalizedStatus === "checkedin"
-                          ? "Checked in"
-                          : "Check in"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-ghost today-card__checkout"
-                      onClick={() => requestCheckout(reservation)}
-                      disabled={checkoutDisabled}
-                      title={checkoutTitle}
-                    >
-                      {isCheckoutBusy ? "Checking out…" : "Check out"}
-                    </button>
+                  <div className="today-card__actionBlock">
+                    <div className="today-card__actions">
+                      <button
+                        type="button"
+                        className="btn btn-ghost today-card__checkin"
+                        onClick={() => requestCheckin(reservation)}
+                        disabled={checkinDisabled}
+                        title={checkinTitle}
+                      >
+                        {isCheckinBusy
+                          ? "Checking in…"
+                          : normalizedStatus === "checkedin"
+                            ? "Checked in"
+                            : "Check in"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost today-card__checkout"
+                        onClick={() => requestCheckout(reservation)}
+                        disabled={checkoutDisabled}
+                        title={checkoutTitle}
+                      >
+                        {isCheckoutBusy ? "Checking out…" : "Check out"}
+                      </button>
+                    </div>
+                    {actionMessage && (
+                      <p className="today-card__info" role="status">{actionMessage}</p>
+                    )}
                   </div>
                 </div>
               );
