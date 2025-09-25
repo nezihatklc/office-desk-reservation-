@@ -52,4 +52,10 @@ namespace backend.DTOs
         [Required]
         public int PerformedByUserId { get; set; }
     }
+
+    public class BookingCheckinRequest
+    {
+        [Required]
+        public int PerformedByUserId { get; set; }
+    }
 }
