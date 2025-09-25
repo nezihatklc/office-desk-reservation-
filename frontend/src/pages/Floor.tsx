@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import axios from "axios";
 import FloorPlan, { type DeskStatus, type LegendKey } from "../components/FloorPlan";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../auth/AuthContext";
 import {
   listDesks,
@@ -16,6 +17,7 @@ import {
   getAllReservations,
   makeReservation,
   checkoutReservation,
+  checkinReservation,
   type Reservation,
 } from "../lib/reservations";
 import {
@@ -23,6 +25,7 @@ import {
   generateDeskLayout,
   toMinutes,
   isoToHHMMInTR,
+  isoDateKeyInTR,
   normalizeDeskCode,
   mapDeskStatus,
   describeFacility,
@@ -39,31 +42,6 @@ function isReservationActive(reservation: Reservation): boolean {
   const status = reservation.status?.trim().toLowerCase();
   if (!status) return true;
   return !INACTIVE_RESERVATION_STATUSES.has(status);
-}
-
-const WORK_START_MINUTES = (() => {
-  const [hours, minutes] = WORK_START.split(":").map(Number);
-  return hours * 60 + minutes;
-})();
-
-const WORK_END_MINUTES = (() => {
-  const [hours, minutes] = WORK_END.split(":").map(Number);
-  return hours * 60 + minutes;
-})();
-
-function minutesToHHMM(totalMinutes: number): string {
-  const hours = Math.floor(totalMinutes / 60)
-    .toString()
-    .padStart(2, "0");
-  const minutes = (totalMinutes % 60).toString().padStart(2, "0");
-  return `${hours}:${minutes}`;
-}
-
-function computeInitialStartTime(now = new Date()): string {
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  const latestStart = Math.max(WORK_START_MINUTES, WORK_END_MINUTES - STEP_MINUTES);
-  const clamped = Math.min(Math.max(currentMinutes, WORK_START_MINUTES), latestStart);
-  return minutesToHHMM(clamped);
 }
 
 const parseLocalDate = (value: string): Date => {
@@ -124,6 +102,12 @@ type SuggestionMeta = {
   generatedAt?: string;
 };
 
+type ConfirmAction = {
+  kind: "checkin" | "checkout";
+  reservation: Reservation;
+  deskLabel: string;
+};
+
 type MetricCardProps = {
   label: string;
   value: number | string;
@@ -156,14 +140,14 @@ export default function Floor() {
   });
 
   const baseLayout = useMemo(generateDeskLayout, []);
-  const today = useMemo(() => formatLocalDate(new Date()), []);
+  const today = useMemo(() => isoDateKeyInTR(new Date().toISOString()), []);
 
   const [deskSummaries, setDeskSummaries] = useState<DeskSummary[]>([]);
   const [facilityCatalog, setFacilityCatalog] = useState<FacilityResponse[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
   const [date, setDate] = useState(today);
-  const [start, setStart] = useState(() => computeInitialStartTime());
+  const [start, setStart] = useState(WORK_START);
   const [end, setEnd] = useState(WORK_END);
   const [selectedDeskId, setSelectedDeskId] = useState<string | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<string>(() => WORKSPACES[0]);
@@ -171,6 +155,9 @@ export default function Floor() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkoutBusyId, setCheckoutBusyId] = useState<number | null>(null);
+  const [checkinBusyId, setCheckinBusyId] = useState<number | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [smartSuggestions, setSmartSuggestions] = useState<DeskSuggestionItem[]>([]);
   const [suggestionMeta, setSuggestionMeta] = useState<SuggestionMeta | null>(null);
@@ -932,7 +919,61 @@ export default function Floor() {
     }
   }
 
-  async function handleCheckout(reservation: Reservation) {
+  function requestCheckin(reservation: Reservation) {
+    const summary = deskSummaryById.get(reservation.deskId);
+    const deskLabel = summary?.deskCode ?? `Desk ${reservation.deskId}`;
+    setConfirmAction({ kind: "checkin", reservation, deskLabel });
+  }
+
+  function requestCheckout(reservation: Reservation) {
+    const summary = deskSummaryById.get(reservation.deskId);
+    const deskLabel = summary?.deskCode ?? `Desk ${reservation.deskId}`;
+    setConfirmAction({ kind: "checkout", reservation, deskLabel });
+  }
+
+  async function performCheckin(reservation: Reservation) {
+    if (!user) {
+      setError("Please sign in to manage your reservation.");
+      return;
+    }
+
+    if (!reservation.bookingId) {
+      return;
+    }
+
+    setError(null);
+    setCheckinBusyId(reservation.bookingId);
+
+    const summary = deskSummaryById.get(reservation.deskId);
+    const deskLabel = summary?.deskCode ?? `Desk ${reservation.deskId}`;
+
+    try {
+      await checkinReservation({
+        bookingId: reservation.bookingId,
+        performedByUserId: currentUserId,
+      });
+
+      await loadFloorData();
+      showToast(`Checked in to ${deskLabel}.`);
+    } catch (err: unknown) {
+      console.error("Failed to check in", err);
+
+      const fallbackMessage = "Check-in failed. Please try again.";
+      const message = axios.isAxiosError(err)
+        ? (typeof err.response?.data?.message === "string"
+            ? err.response.data.message
+            : err.message)
+        : err instanceof Error
+          ? err.message
+          : fallbackMessage;
+
+      setError(message || fallbackMessage);
+    } finally {
+      setCheckinBusyId(null);
+    }
+  }
+
+  async function performCheckout(reservation: Reservation) {
     if (!user) {
       setError("Please sign in to manage your reservation.");
       return;
@@ -992,6 +1033,22 @@ export default function Floor() {
       setError(message || fallbackMessage);
     } finally {
       setCheckoutBusyId(null);
+    }
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+
+    try {
+      if (confirmAction.kind === "checkin") {
+        await performCheckin(confirmAction.reservation);
+      } else {
+        await performCheckout(confirmAction.reservation);
+      }
+    } finally {
+      setConfirmBusy(false);
+      setConfirmAction(null);
     }
   }
 
@@ -1163,13 +1220,47 @@ export default function Floor() {
           <span className="today-card__title">Today’s Desk</span>
           <span className="today-card__date">{selectedDateBanner}</span>
         </header>
-        {myReservationsForSelectedDate.length > 0 ? (
+            {myReservationsForSelectedDate.length > 0 ? (
           <div className="today-card__body">
             {myReservationsForSelectedDate.map((reservation) => {
               const summary = deskSummaryById.get(reservation.deskId);
               const deskLabel = summary?.deskCode ?? `Desk ${reservation.deskId}`;
               const key = reservation.bookingId?.toString() ?? `${reservation.deskId}-${reservation.bookingStart}`;
-              const isBusy = checkoutBusyId === reservation.bookingId;
+              const normalizedStatus = reservation.status?.trim().toLowerCase();
+              const isCheckinBusy = checkinBusyId === reservation.bookingId;
+              const isCheckoutBusy = checkoutBusyId === reservation.bookingId;
+              const isReservationToday =
+                isoDateKeyInTR(reservation.bookingStart) === today;
+              const statusLabel = (() => {
+                switch (normalizedStatus) {
+                  case "checkedin":
+                    return "Checked in";
+                  case "confirmed":
+                    return "Confirmed";
+                  case "pending":
+                    return "Pending";
+                  default:
+                    return null;
+                }
+              })();
+
+              const checkinDisabled =
+                !isReservationToday ||
+                isCheckinBusy ||
+                normalizedStatus === "checkedin" ||
+                normalizedStatus === "checkedout";
+              const checkoutDisabled =
+                !isReservationToday ||
+                isCheckoutBusy ||
+                isCheckinBusy ||
+                normalizedStatus === "checkedout";
+              const checkinTitle = checkinDisabled && !isReservationToday
+                ? "Check-in is only available on the reservation day."
+                : undefined;
+              const checkoutTitle = checkoutDisabled && !isReservationToday
+                ? "Check-out is only available on the reservation day."
+                : undefined;
+
               return (
                 <div key={key} className="today-card__entry">
                   <div className="today-card__details">
@@ -1177,15 +1268,32 @@ export default function Floor() {
                     <span>
                       {isoToHHMMInTR(reservation.bookingStart)} – {isoToHHMMInTR(reservation.bookingEnd)}
                     </span>
+                    {statusLabel && <span className="today-card__status">{statusLabel}</span>}
                   </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost today-card__checkout"
-                    onClick={() => handleCheckout(reservation)}
-                    disabled={isBusy}
-                  >
-                    {isBusy ? "Checking out…" : "Check out"}
-                  </button>
+                  <div className="today-card__actions">
+                    <button
+                      type="button"
+                      className="btn btn-ghost today-card__checkin"
+                      onClick={() => requestCheckin(reservation)}
+                      disabled={checkinDisabled}
+                      title={checkinTitle}
+                    >
+                      {isCheckinBusy
+                        ? "Checking in…"
+                        : normalizedStatus === "checkedin"
+                          ? "Checked in"
+                          : "Check in"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost today-card__checkout"
+                      onClick={() => requestCheckout(reservation)}
+                      disabled={checkoutDisabled}
+                      title={checkoutTitle}
+                    >
+                      {isCheckoutBusy ? "Checking out…" : "Check out"}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -1458,6 +1566,20 @@ export default function Floor() {
           {toast}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.kind === "checkin" ? "Confirm check-in" : "Confirm check-out"}
+        message={confirmAction ? `You are ${confirmAction.kind === "checkin" ? "checking in to" : "checking out of"} ${confirmAction.deskLabel}. Are you sure?` : ""}
+        confirmLabel={confirmAction?.kind === "checkin" ? "Yes, check in" : "Yes, check out"}
+        cancelLabel="Cancel"
+        busy={confirmBusy}
+        onCancel={() => {
+          if (confirmBusy) return;
+          setConfirmAction(null);
+        }}
+        onConfirm={handleConfirmAction}
+      />
     </div>
   );
 }
