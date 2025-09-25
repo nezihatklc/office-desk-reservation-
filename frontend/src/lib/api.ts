@@ -265,6 +265,10 @@ export interface BookingCheckoutRequest {
   performedByUserId: number;
 }
 
+export interface BookingCheckinRequest {
+  performedByUserId: number;
+}
+
 export async function listBookings(): Promise<BookingResponse[]> {
   const { data } = await API.get<BookingResponse[]>("/Bookings");
   return data;
@@ -280,6 +284,14 @@ export async function checkoutBooking(
   payload: BookingCheckoutRequest
 ): Promise<BookingResponse> {
   const { data } = await API.post<BookingResponse>(`/Bookings/${bookingId}/checkout`, payload);
+  return data;
+}
+
+export async function checkinBooking(
+  bookingId: number,
+  payload: BookingCheckinRequest
+): Promise<BookingResponse> {
+  const { data } = await API.post<BookingResponse>(`/Bookings/${bookingId}/checkin`, payload);
   return data;
 }
 
