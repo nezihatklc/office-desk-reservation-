@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import axios from "axios";
 import FloorPlan, { type DeskStatus, type LegendKey } from "../components/FloorPlan";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../auth/AuthContext";
 import {
   listDesks,
@@ -11,12 +12,18 @@ import {
   type FacilityResponse,
   type WorkspaceResponse,
 } from "../lib/api";
-import { getAllReservations, type Reservation } from "../lib/reservations";
+import {
+  getAllReservations,
+  checkinReservation,
+  checkoutReservation,
+  type Reservation,
+} from "../lib/reservations";
 import {
   WORKSPACES,
   HEATMAP_LOOKBACK_DAYS,
   generateDeskLayout,
   isoToHHMMInTR,
+  isoDateKeyInTR,
   normalizeDeskCode,
   workspaceFromDesk,
   mapDeskStatus,
@@ -60,6 +67,20 @@ const DESK_STATUS_META: Record<LegendKey, { label: string; helper: string; tone:
   },
 };
 
+const INACTIVE_RESERVATION_STATUSES = new Set(["checkedout", "cancelled", "completed"]);
+
+function isReservationActive(reservation: Reservation): boolean {
+  const status = reservation.status?.trim().toLowerCase();
+  if (!status) return true;
+  return !INACTIVE_RESERVATION_STATUSES.has(status);
+}
+
+type AdminConfirmAction = {
+  kind: "checkin" | "checkout";
+  reservation: Reservation;
+  deskLabel: string;
+};
+
 export default function Admin() {
   const { user } = useAuth();
   const [deskSummaries, setDeskSummaries] = useState<DeskSummary[]>([]);
@@ -76,8 +97,13 @@ export default function Admin() {
   const [teamDrafts, setTeamDrafts] = useState<Record<number, string>>({});
   const [teamNotice, setTeamNotice] = useState<string | null>(null);
   const [savingWorkspaceId, setSavingWorkspaceId] = useState<number | null>(null);
+  const [checkinBusyId, setCheckinBusyId] = useState<number | null>(null);
+  const [checkoutBusyId, setCheckoutBusyId] = useState<number | null>(null);
+  const [confirmAction, setConfirmAction] = useState<AdminConfirmAction | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const baseLayout = useMemo(generateDeskLayout, []);
+  const todayKey = useMemo(() => isoDateKeyInTR(new Date().toISOString()), []);
 
   const dateLabel = useMemo(() => {
     const parsed = new Date(date);
@@ -191,6 +217,7 @@ export default function Admin() {
     reservations.forEach((reservation) => {
       const startIso = reservation.bookingStart ?? "";
       if (!startIso.startsWith(date)) return;
+      if (!isReservationActive(reservation)) return;
 
       if (!map.has(reservation.deskId)) {
         map.set(reservation.deskId, []);
@@ -313,6 +340,126 @@ export default function Admin() {
     },
     [persistTeamAssignment]
   );
+
+  const applyReservationUpdate = useCallback((updated: Reservation) => {
+    setReservations((prev) =>
+      prev.map((entry) => (entry.bookingId === updated.bookingId ? { ...updated } : entry))
+    );
+  }, []);
+
+  const formatReservationStatus = useCallback((status: string | null | undefined) => {
+    const normalized = status?.trim().toLowerCase();
+    switch (normalized) {
+      case "checkedin":
+        return "Checked in";
+      case "checkedout":
+        return "Checked out";
+      case "pending":
+        return "Pending";
+      case "cancelled":
+        return "Cancelled";
+      default:
+        return "Confirmed";
+    }
+  }, []);
+
+  const requestCheckin = useCallback(
+    (reservation: Reservation) => {
+      const summary = deskById.get(reservation.deskId);
+      const deskLabel = summary?.deskCode ?? `Desk ${reservation.deskId}`;
+      setConfirmAction({ kind: "checkin", reservation, deskLabel });
+    },
+    [deskById]
+  );
+
+  const requestCheckout = useCallback(
+    (reservation: Reservation) => {
+      const summary = deskById.get(reservation.deskId);
+      const deskLabel = summary?.deskCode ?? `Desk ${reservation.deskId}`;
+      setConfirmAction({ kind: "checkout", reservation, deskLabel });
+    },
+    [deskById]
+  );
+
+  const performCheckin = useCallback(
+    async (reservation: Reservation) => {
+      if (!user || !reservation.bookingId) return;
+
+      setError(null);
+      setCheckinBusyId(reservation.bookingId);
+
+      try {
+        const updated = await checkinReservation({
+          bookingId: reservation.bookingId,
+          performedByUserId: user.userId,
+        });
+
+        applyReservationUpdate(updated);
+      } catch (err) {
+        console.error("Admin check-in failed", err);
+        const fallbackMessage = "Failed to check in. Please try again.";
+        const message = axios.isAxiosError(err)
+          ? (typeof err.response?.data?.message === "string" ? err.response.data.message : err.message)
+          : err instanceof Error
+            ? err.message
+            : fallbackMessage;
+        setError(message || fallbackMessage);
+      } finally {
+        setCheckinBusyId(null);
+      }
+    },
+    [applyReservationUpdate, setError, user]
+  );
+
+  const performCheckout = useCallback(
+    async (reservation: Reservation) => {
+      if (!user || !reservation.bookingId) return;
+
+      setError(null);
+      setCheckoutBusyId(reservation.bookingId);
+
+      try {
+        const updated = await checkoutReservation({
+          bookingId: reservation.bookingId,
+          performedByUserId: user.userId,
+        });
+
+        applyReservationUpdate(updated);
+      } catch (err) {
+        console.error("Admin checkout failed", err);
+        const fallbackMessage = "Failed to check out. Please try again.";
+        const message = axios.isAxiosError(err)
+          ? (typeof err.response?.data?.message === "string"
+              ? err.response.data.message
+              : err.response?.status === 403
+                ? "You are not allowed to perform this action."
+                : err.message)
+          : err instanceof Error
+            ? err.message
+            : fallbackMessage;
+        setError(message || fallbackMessage);
+      } finally {
+        setCheckoutBusyId(null);
+      }
+    },
+    [applyReservationUpdate, setError, user]
+  );
+
+  const handleConfirmAction = useCallback(async () => {
+    if (!confirmAction) return;
+    setConfirmBusy(true);
+
+    try {
+      if (confirmAction.kind === "checkin") {
+        await performCheckin(confirmAction.reservation);
+      } else {
+        await performCheckout(confirmAction.reservation);
+      }
+    } finally {
+      setConfirmBusy(false);
+      setConfirmAction(null);
+    }
+  }, [confirmAction, performCheckin, performCheckout]);
 
   const viewDesks: Array<DeskStatus & { reservations: Array<{ occupant?: string; range?: string }> }> = useMemo(() => {
     return baseLayout.map((desk) => {
@@ -881,6 +1028,8 @@ export default function Admin() {
                   <th>Workspace</th>
                   <th>Employee</th>
                   <th>Time</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -888,6 +1037,40 @@ export default function Admin() {
                   const summary = deskById.get(reservation.deskId);
                   const deskCode = summary?.deskCode ?? `Desk ${reservation.deskId}`;
                   const workspace = workspaceFromDesk(summary?.deskCode);
+                  const normalizedStatus = reservation.status?.trim().toLowerCase();
+                  const isReservationToday =
+                    isoDateKeyInTR(reservation.bookingStart) === todayKey;
+                  const statusLabel = formatReservationStatus(reservation.status);
+                  const isCheckinInFlight = checkinBusyId === reservation.bookingId;
+                  const isCheckoutInFlight = checkoutBusyId === reservation.bookingId;
+                  const checkinDisabled =
+                    !isReservationToday ||
+                    isCheckinInFlight ||
+                    isCheckoutInFlight ||
+                    normalizedStatus === "checkedin" ||
+                    normalizedStatus === "checkedout";
+                  const checkoutDisabled =
+                    !isReservationToday ||
+                    isCheckoutInFlight ||
+                    isCheckinInFlight ||
+                    normalizedStatus === "checkedout";
+                  const checkinLabel = isCheckinInFlight
+                    ? "Checking in…"
+                    : normalizedStatus === "checkedin"
+                      ? "Checked in"
+                      : "Check in";
+                  const checkoutLabel = isCheckoutInFlight
+                    ? "Checking out…"
+                    : normalizedStatus === "checkedout"
+                      ? "Checked out"
+                      : "Check out";
+                  const isConfirming = confirmAction?.reservation.bookingId === reservation.bookingId;
+                  const checkinTitle = checkinDisabled && !isReservationToday
+                    ? "Check-in is only available on the reservation day."
+                    : undefined;
+                  const checkoutTitle = checkoutDisabled && !isReservationToday
+                    ? "Check-out is only available on the reservation day."
+                    : undefined;
                   return (
                     <tr key={reservation.bookingId}>
                       <td>{deskCode}</td>
@@ -900,6 +1083,33 @@ export default function Admin() {
                       <td>
                         {isoToHHMMInTR(reservation.bookingStart)} – {isoToHHMMInTR(reservation.bookingEnd)}
                       </td>
+                      <td>
+                        <span className="admin-bookings__status" data-status={normalizedStatus ?? ""}>
+                          {statusLabel}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="admin-bookings__actions">
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => requestCheckin(reservation)}
+                            disabled={checkinDisabled || isConfirming}
+                            title={checkinTitle}
+                          >
+                            {checkinLabel}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => requestCheckout(reservation)}
+                            disabled={checkoutDisabled || isConfirming}
+                            title={checkoutTitle}
+                          >
+                            {checkoutLabel}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -908,6 +1118,20 @@ export default function Admin() {
           )}
         </div>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(confirmAction)}
+        title={confirmAction?.kind === "checkin" ? "Confirm check-in" : "Confirm check-out"}
+        message={confirmAction ? `You are ${confirmAction.kind === "checkin" ? "checking in to" : "checking out of"} ${confirmAction.deskLabel}. Are you sure?` : ""}
+        confirmLabel={confirmAction?.kind === "checkin" ? "Yes, check in" : "Yes, check out"}
+        cancelLabel="Cancel"
+        busy={confirmBusy}
+        onCancel={() => {
+          if (confirmBusy) return;
+          setConfirmAction(null);
+        }}
+        onConfirm={handleConfirmAction}
+      />
     </div>
   );
 }
