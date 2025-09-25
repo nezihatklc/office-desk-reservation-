@@ -491,7 +491,7 @@ aside.col { gap: 18px !important; }
 .today-card__entry {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
 }
 
@@ -501,14 +501,29 @@ aside.col { gap: 18px !important; }
   gap: 2px;
 }
 
+.today-card__actionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: right;
+  max-width: 240px;
+}
+
 .today-card__actions {
   display: flex;
   gap: 8px;
+  justify-content: flex-end;
 }
 
 .today-card__status {
   font-size: 0.875rem;
   color: var(--colors-secondary-main);
+}
+
+.today-card__info {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--colors-text-muted, #4b5563);
 }
 
 .today-card__checkin,
@@ -1987,6 +2002,87 @@ aside.col { gap: 18px !important; }
   gap: 1.3rem;
 }
 
+.admin-inline-banner {
+  margin: 0.75rem 0;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 12px 24px rgba(7, 25, 43, 0.18);
+}
+
+.admin-inline-banner--success {
+  background: rgba(34, 197, 94, 0.14);
+  color: #065f46;
+}
+
+.admin-inline-banner--error {
+  background: rgba(239, 68, 68, 0.16);
+  color: #7f1d1d;
+}
+
+.admin-attendance {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.attendance-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.attendance-summary > div {
+  background: rgba(16, 32, 52, 0.06);
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attendance-summary .label {
+  font-size: 0.85rem;
+  color: var(--colors-text-muted, #4b5563);
+}
+
+.attendance-overdue ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.attendance-overdue li {
+  background: rgba(16, 32, 52, 0.04);
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.attendance-overdue .primary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.attendance-overdue .secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: right;
+  font-size: 0.85rem;
+  color: var(--colors-text-muted, #4b5563);
+}
+
 .admin-summary-grid .metric-card {
   position: relative;
   display: grid;
@@ -2538,6 +2634,12 @@ aside.col { gap: 18px !important; }
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.admin-bookings__hint {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: var(--colors-text-muted, #4b5563);
 }
 
 /* ===== Notifications ===== */
