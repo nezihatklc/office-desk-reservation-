@@ -8,6 +8,7 @@ import type {
   BookingCheckinRequest,
   UserResponse,
 } from "./api";
+import { addCancellationRecord, type CancellationReason } from "./notificationStore";
 
 export type Reservation = Omit<BookingResponse, "user"> & {
   user?: UserResponse | null;
@@ -15,6 +16,7 @@ export type Reservation = Omit<BookingResponse, "user"> & {
 
 // cache user lookups if needed in the future
 const userCache = new Map<number, UserResponse>();
+let lastKnownStatuses = new Map<number, string | null>();
 
 async function expandUser(b: BookingResponse): Promise<Reservation> {
   if (b.user) {
@@ -33,7 +35,9 @@ async function expandUser(b: BookingResponse): Promise<Reservation> {
 export async function getAllReservations(): Promise<Reservation[]> {
   try {
     const bookings = await listBookings();
-    return await Promise.all(bookings.map(expandUser));
+    const reservations = await Promise.all(bookings.map(expandUser));
+    trackReservationCancellations(reservations);
+    return reservations;
   } catch (err) {
     console.error("getAllReservations failed:", err);
     return [];
@@ -145,4 +149,35 @@ export function fmtRangeEnGB(startISO: string, endISO: string) {
     });
 
   return { dateLabel, timeLabel };
+}
+
+function trackReservationCancellations(reservations: Reservation[]) {
+  const nextStatuses = new Map<number, string | null>();
+
+  reservations.forEach((reservation) => {
+    const normalizedStatus = reservation.status?.trim().toLowerCase() ?? null;
+    const previousStatus = lastKnownStatuses.get(reservation.bookingId);
+
+    if (
+      normalizedStatus === "cancelled" &&
+      previousStatus !== undefined &&
+      previousStatus !== "cancelled"
+    ) {
+      const reason: CancellationReason = "auto-missed-checkin";
+      addCancellationRecord({
+        bookingId: reservation.bookingId,
+        userId: reservation.userId,
+        deskCode: reservation.deskCode ?? reservation.deskId.toString(),
+        bookingDate: reservation.bookingDate,
+        bookingStart: reservation.bookingStart,
+        bookingEnd: reservation.bookingEnd,
+        recordedAt: new Date().toISOString(),
+        reason,
+      });
+    }
+
+    nextStatuses.set(reservation.bookingId, normalizedStatus);
+  });
+
+  lastKnownStatuses = nextStatuses;
 }
