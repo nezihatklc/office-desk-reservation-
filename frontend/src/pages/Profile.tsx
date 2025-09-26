@@ -6,7 +6,8 @@ import {
   type BookingResponse,
   type AuditLogResponse,
 } from "../lib/api";
-import API from "../lib/api"; // 🔹 import axios instance for DELETE
+import API from "../lib/api";
+import { addCancellationRecord } from "../lib/notificationStore";
 import { isoToHHMMInTR } from "../lib/floorUtils";
 
 type TabKey = "upcoming" | "past";
@@ -46,8 +47,22 @@ export default function ProfilePage() {
 
     try {
       setLoading(true);
+      const booking = upcoming.find((entry) => entry.bookingId === id);
       await API.delete(`/Bookings/${id}`);
       setUpcoming((prev) => prev.filter((r) => r.bookingId !== id)); // update UI
+
+      if (booking && userId) {
+        addCancellationRecord({
+          bookingId: booking.bookingId,
+          userId,
+          deskCode: booking.deskCode ?? booking.deskId.toString(),
+          bookingDate: booking.bookingDate,
+          bookingStart: booking.bookingStart,
+          bookingEnd: booking.bookingEnd,
+          recordedAt: new Date().toISOString(),
+          reason: "user",
+        });
+      }
     } catch (err) {
       console.error("Failed to cancel booking:", err);
       alert("Failed to cancel booking. Please try again.");
