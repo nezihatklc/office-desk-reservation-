@@ -43,6 +43,9 @@ const parseLocalDate = (value: string): Date => {
   return new Date(year, (month ?? 1) - 1, day ?? 1);
 };
 
+const CHECKIN_EXPIRY_MINUTES = 60;
+const NOW_REFRESH_INTERVAL_MS = 30_000;
+const MINUTE_IN_MS = 60_000;
 const MAX_RECENT_BOOKINGS = 12;
 
 const DESK_STATUS_META: Record<LegendKey, { label: string; helper: string; tone: "available" | "busy" | "mine" | "offline" }> = {
@@ -70,10 +73,25 @@ const DESK_STATUS_META: Record<LegendKey, { label: string; helper: string; tone:
 
 const INACTIVE_RESERVATION_STATUSES = new Set(["checkedout", "cancelled", "completed"]);
 
-function isReservationActive(reservation: Reservation): boolean {
+function hasCheckinExpired(reservation: Reservation, referenceMs: number): boolean {
   const status = reservation.status?.trim().toLowerCase();
-  if (!status) return true;
-  return !INACTIVE_RESERVATION_STATUSES.has(status);
+  if (status === "checkedin") return false;
+  if (status && INACTIVE_RESERVATION_STATUSES.has(status)) return true;
+
+  const startMs = new Date(reservation.bookingStart).getTime();
+  if (Number.isNaN(startMs)) return false;
+
+  return referenceMs > startMs + CHECKIN_EXPIRY_MINUTES * MINUTE_IN_MS;
+}
+
+function isReservationActive(reservation: Reservation, referenceMs: number): boolean {
+  const status = reservation.status?.trim().toLowerCase();
+  if (!status) {
+    return !hasCheckinExpired(reservation, referenceMs);
+  }
+  if (INACTIVE_RESERVATION_STATUSES.has(status)) return false;
+  if (status === "checkedin") return true;
+  return !hasCheckinExpired(reservation, referenceMs);
 }
 
 type AdminConfirmAction = {
@@ -103,6 +121,7 @@ export default function Admin() {
   const [confirmAction, setConfirmAction] = useState<AdminConfirmAction | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [banner, setBanner] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const baseLayout = useMemo(generateDeskLayout, []);
   const todayKey = useMemo(() => isoDateKeyInTR(new Date().toISOString()), []);
@@ -152,6 +171,13 @@ export default function Admin() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const tick = () => setNowMs(Date.now());
+    const intervalId = window.setInterval(tick, NOW_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (!banner) return;
@@ -225,7 +251,7 @@ export default function Admin() {
     reservations.forEach((reservation) => {
       const startIso = reservation.bookingStart ?? "";
       if (!startIso.startsWith(date)) return;
-      if (!isReservationActive(reservation)) return;
+      if (!isReservationActive(reservation, nowMs)) return;
 
       if (!map.has(reservation.deskId)) {
         map.set(reservation.deskId, []);
@@ -239,7 +265,7 @@ export default function Admin() {
     );
 
     return map;
-  }, [reservations, date]);
+  }, [reservations, date, nowMs]);
 
   const todaysReservations = useMemo(
     () => reservations.filter((reservation) => isoDateKeyInTR(reservation.bookingStart) === todayKey),
@@ -263,7 +289,7 @@ export default function Admin() {
   }, [todaysReservations]);
 
   const overdueCheckins = useMemo(() => {
-    const now = Date.now();
+    const now = nowMs;
     return todaysReservations
       .filter((reservation) => {
         const status = reservation.status?.trim().toLowerCase();
@@ -273,7 +299,7 @@ export default function Admin() {
         return startTime < now;
       })
       .sort((a, b) => a.bookingStart.localeCompare(b.bookingStart));
-  }, [todaysReservations]);
+  }, [todaysReservations, nowMs]);
 
   const workspaceHeat = useMemo(() => {
     const cutoff = new Date();
@@ -604,8 +630,9 @@ export default function Admin() {
   const reservationsForDate = useMemo(() => {
     return reservations
       .filter((reservation) => (reservation.bookingStart ?? "").startsWith(date))
+      .filter((reservation) => isReservationActive(reservation, nowMs))
       .sort((a, b) => a.bookingStart.localeCompare(b.bookingStart));
-  }, [reservations, date]);
+  }, [reservations, date, nowMs]);
 
   const filteredReservations = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
