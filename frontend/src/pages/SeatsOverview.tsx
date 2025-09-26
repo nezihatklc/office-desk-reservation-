@@ -6,6 +6,10 @@ import { getAllReservations, type Reservation } from "../lib/reservations";
 const STEP_MINUTES = 30;
 const WORK_START = "09:00";
 const WORK_END = "18:00";
+const CHECKIN_EXPIRY_MINUTES = 60;
+const NOW_REFRESH_INTERVAL_MS = 30_000;
+const MINUTE_IN_MS = 60_000;
+const INACTIVE_RESERVATION_STATUSES = new Set(["checkedout", "cancelled", "completed"]);
 
 const parseLocalDate = (value: string): Date => {
   const [year, month, day] = value.split("-").map(Number);
@@ -42,6 +46,17 @@ const toMinutes = (hhmm: string): number => {
   return (h ?? 0) * 60 + (m ?? 0);
 };
 
+const hasCheckinExpired = (reservation: Reservation, referenceMs: number): boolean => {
+  const status = reservation.status?.trim().toLowerCase();
+  if (status === "checkedin") return false;
+  if (status && INACTIVE_RESERVATION_STATUSES.has(status)) return true;
+
+  const startMs = new Date(reservation.bookingStart).getTime();
+  if (Number.isNaN(startMs)) return false;
+
+  return referenceMs > startMs + CHECKIN_EXPIRY_MINUTES * MINUTE_IN_MS;
+};
+
 export default function SeatsOverview() {
   const { user } = useAuth();
   const currentUserId = user?.userId ?? 0;
@@ -53,6 +68,7 @@ export default function SeatsOverview() {
   const [deskSummaries, setDeskSummaries] = useState<DeskSummary[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const loadData = useCallback(async () => {
     try {
@@ -72,6 +88,13 @@ export default function SeatsOverview() {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const tick = () => setNowMs(Date.now());
+    const intervalId = window.setInterval(tick, NOW_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const changeDateBy = (delta: number) => {
     setDate((prev) => {
       const base = prev ? parseLocalDate(prev) : parseLocalDate(todayDefault);
@@ -85,6 +108,7 @@ export default function SeatsOverview() {
     reservations.forEach((reservation) => {
       const startIso = reservation.bookingStart ?? "";
       if (!startIso.startsWith(date)) return;
+      if (hasCheckinExpired(reservation, nowMs)) return;
 
       if (!map.has(reservation.deskId)) {
         map.set(reservation.deskId, []);
@@ -97,7 +121,7 @@ export default function SeatsOverview() {
     );
 
     return map;
-  }, [reservations, date]);
+  }, [reservations, date, nowMs]);
 
   const dayStartMinutes = toMinutes(WORK_START);
   const dayEndMinutes = toMinutes(WORK_END);
