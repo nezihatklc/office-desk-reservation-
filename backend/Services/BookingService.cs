@@ -155,6 +155,11 @@ namespace backend.Services
                 return booking;
             }
 
+            if (booking.Status != null && string.Equals(booking.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("This booking has been cancelled because the check-in window expired.");
+            }
+
             var actor = await _userRepository.GetByIdAsync(performedByUserId)
                 ?? throw new NotFoundException($"User {performedByUserId} not found.");
 
@@ -166,17 +171,17 @@ namespace backend.Services
                 throw new UnauthorizedAccessException("You are not allowed to check in this booking.");
 
             var bookingStartUtc = NormalizeToUtc(booking.BookingStart);
-            var bookingEndUtc = NormalizeToUtc(booking.BookingEnd);
             var nowUtc = DateTime.UtcNow;
 
             if (bookingStartUtc.Date != nowUtc.Date)
                 throw new InvalidOperationException("You can only check in on the reservation day.");
 
-            if (nowUtc < bookingStartUtc.AddMinutes(-30))
-                throw new InvalidOperationException("You can only check in up to 30 minutes before your reservation starts.");
+            if (nowUtc < bookingStartUtc.AddMinutes(-BookingPolicies.CheckinLeadMinutes))
+                throw new InvalidOperationException($"You can only check in up to {BookingPolicies.CheckinLeadMinutes} minutes before your reservation starts.");
 
-            if (nowUtc > bookingEndUtc)
-                throw new InvalidOperationException("This reservation already ended. Please contact an administrator.");
+            var checkinDeadlineUtc = bookingStartUtc.AddMinutes(BookingPolicies.CheckinGraceMinutes);
+            if (nowUtc > checkinDeadlineUtc)
+                throw new InvalidOperationException("The check-in window has closed for this reservation.");
 
             await _bookingRepository.SetStatusAsync(booking, "CheckedIn", cancellationToken);
 
