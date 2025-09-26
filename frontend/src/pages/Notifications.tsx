@@ -166,13 +166,29 @@ export default function NotificationsPage() {
             month: "short",
             day: "numeric",
           });
+          const reason = record.reason ?? "admin";
+          const reasonMessage = (() => {
+            switch (reason) {
+              case "auto-missed-checkin":
+                return "Cancelled automatically after the check-in window.";
+              case "user":
+                return "Cancelled by you.";
+              default:
+                return "Cancelled by an administrator.";
+            }
+          })();
+          const tone: NotificationItem["tone"] = reason === "auto-missed-checkin"
+            ? "alert"
+            : reason === "user"
+              ? "info"
+              : "warning";
           return {
             id,
             title: `Reservation cancelled for ${record.deskCode ?? `Desk #${record.bookingId}`}`,
-            message: `${dateLabel} · ${isoToHHMMInTR(record.bookingStart)} – ${isoToHHMMInTR(record.bookingEnd)} · Cancelled by an administrator`,
+            message: `${dateLabel} · ${isoToHHMMInTR(record.bookingStart)} – ${isoToHHMMInTR(record.bookingEnd)} · ${reasonMessage}`,
             timestamp: record.recordedAt,
             read: storedIds.has(id),
-            tone: "alert",
+            tone,
             href: "/me",
           };
         });
