@@ -31,11 +31,17 @@ import {
   mapDeskStatus,
   describeFacility,
 } from "../lib/floorUtils";
-import { addCheckoutRecord } from "../lib/notificationStore";
+import { addCheckoutRecord, loadCancellationRecords } from "../lib/notificationStore";
 
 const WORK_START = "09:00";
 const WORK_END = "18:00";
 const STEP_MINUTES = 1;
+const CHECKIN_WINDOW_BEFORE_MINUTES = 30;
+const CHECKIN_WINDOW_AFTER_MINUTES = 30;
+const CHECKOUT_WINDOW_BEFORE_MINUTES = 30;
+const CHECKOUT_WINDOW_AFTER_MINUTES = 60;
+const NOW_REFRESH_INTERVAL_MS = 30_000;
+const MINUTE_IN_MS = 60_000;
 
 const INACTIVE_RESERVATION_STATUSES = new Set(["checkedout", "cancelled", "completed"]);
 
@@ -55,30 +61,6 @@ const formatLocalDate = (date: Date): string => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-};
-
-const getOrdinalSuffix = (day: number): string => {
-  if (day >= 11 && day <= 13) return "th";
-
-  switch (day % 10) {
-    case 1:
-      return "st";
-    case 2:
-      return "nd";
-    case 3:
-      return "rd";
-    default:
-      return "th";
-  }
-};
-
-const formatFriendlyDate = (date: Date): string => {
-  const month = date.toLocaleDateString("en-US", { month: "long" });
-  const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
-  const day = date.getDate();
-  const suffix = getOrdinalSuffix(day);
-
-  return `${month} ${day}${suffix} ${weekday}`;
 };
 
 type SummaryMetrics = {
@@ -115,6 +97,13 @@ type MetricCardProps = {
   accent?: string;
   description?: string;
 };
+
+function formatWindowLabel(startMs: number | null, endMs: number | null): string | null {
+  if (typeof startMs !== "number" || typeof endMs !== "number") return null;
+  const startIso = new Date(startMs).toISOString();
+  const endIso = new Date(endMs).toISOString();
+  return `${isoToHHMMInTR(startIso)} – ${isoToHHMMInTR(endIso)}`;
+}
 
 const LEGEND: LegendItem[] = [
   { key: "byMe", label: "My reservations", swatch: "#69a7ff" },
@@ -165,13 +154,31 @@ export default function Floor() {
   const [suggestionKey, setSuggestionKey] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const currentSuggestionKey = useMemo(() => `${date}|${start}|${end}`, [date, start, end]);
   const suggestionsStale = suggestionKey !== null && suggestionKey !== currentSuggestionKey;
   const toastTimeoutRef = useRef<number | null>(null);
+  const lastCancellationToastRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const updateNow = () => setNowMs(Date.now());
+    updateNow();
+    const intervalId = window.setInterval(updateNow, NOW_REFRESH_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   const selectedDateBanner = useMemo(() => {
-    return formatFriendlyDate(parseLocalDate(date));
+    const parsed = parseLocalDate(date);
+    if (Number.isNaN(parsed.getTime())) return date;
+    return new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Istanbul",
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(parsed);
   }, [date]);
 
   const loadFloorData = useCallback(async () => {
@@ -665,6 +672,27 @@ export default function Floor() {
     }, 3200);
   }, []);
 
+  const notifyCancellationIfNeeded = useCallback(() => {
+    if (!user) return false;
+    const records = loadCancellationRecords();
+    if (!records.length) return false;
+    const mine = records.find((record) => record.userId === currentUserId);
+    if (!mine) return false;
+    const key = `${mine.bookingId}-${mine.recordedAt}`;
+    if (lastCancellationToastRef.current === key) return false;
+    lastCancellationToastRef.current = key;
+
+    const deskLabel = mine.deskCode ?? `Desk #${mine.bookingId}`;
+    const message = mine.reason === "auto-missed-checkin"
+      ? `${deskLabel} was cancelled after the check-in window closed.`
+      : mine.reason === "user"
+        ? `You cancelled ${deskLabel}.`
+        : `${deskLabel} was cancelled by an administrator.`;
+
+    showToast(message);
+    return true;
+  }, [currentUserId, showToast, user]);
+
   useEffect(() => {
     return () => {
       if (toastTimeoutRef.current) {
@@ -672,6 +700,36 @@ export default function Floor() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const handleCancellation = () => {
+      const notified = notifyCancellationIfNeeded();
+      if (notified) {
+        void loadFloorData();
+      }
+    };
+
+    window.addEventListener("notifications:cancellations", handleCancellation);
+    return () => {
+      window.removeEventListener("notifications:cancellations", handleCancellation);
+    };
+  }, [loadFloorData, notifyCancellationIfNeeded, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const records = loadCancellationRecords();
+    const mine = records.find((record) => record.userId === currentUserId);
+    if (mine) {
+      lastCancellationToastRef.current = `${mine.bookingId}-${mine.recordedAt}`;
+    }
+  }, [currentUserId, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    notifyCancellationIfNeeded();
+  }, [notifyCancellationIfNeeded, reservations, user]);
 
   const handleDismissGuide = () => {
     setShowGuide(false);
@@ -903,7 +961,8 @@ export default function Floor() {
       console.error("Failed to reserve desk", err);
 
       if (axios.isAxiosError(err) && err.response?.status === 409) {
-        window.alert("You already have a desk booked for this day. You can only reserve one desk per day.");
+        setError(null);
+        showToast("You already have a desk for this day. Reserve one desk per day.");
         return;
       }
 
@@ -1218,8 +1277,7 @@ export default function Floor() {
         onClick={(event) => event.stopPropagation()}
       >
         <header className="today-card__header">
-          <span className="today-card__title">Today’s Desk</span>
-          <span className="today-card__date">{selectedDateBanner}</span>
+          <h2 className="today-card__date">{selectedDateBanner}</h2>
         </header>
             {myReservationsForSelectedDate.length > 0 ? (
           <div className="today-card__body">
@@ -1247,22 +1305,77 @@ export default function Floor() {
                 }
               })();
 
-              const checkinDisabled =
+              const startMs = new Date(reservation.bookingStart).getTime();
+              const endMs = new Date(reservation.bookingEnd).getTime();
+              const checkinWindowStartMs = Number.isNaN(startMs)
+                ? null
+                : startMs - CHECKIN_WINDOW_BEFORE_MINUTES * MINUTE_IN_MS;
+              const checkinWindowEndMs = Number.isNaN(startMs)
+                ? null
+                : startMs + CHECKIN_WINDOW_AFTER_MINUTES * MINUTE_IN_MS;
+              const checkoutWindowStartMs = Number.isNaN(endMs)
+                ? null
+                : endMs - CHECKOUT_WINDOW_BEFORE_MINUTES * MINUTE_IN_MS;
+              const checkoutWindowEndMs = Number.isNaN(endMs)
+                ? null
+                : endMs + CHECKOUT_WINDOW_AFTER_MINUTES * MINUTE_IN_MS;
+              const isWithinCheckinWindow =
+                typeof checkinWindowStartMs === "number" &&
+                typeof checkinWindowEndMs === "number" &&
+                nowMs >= checkinWindowStartMs &&
+                nowMs <= checkinWindowEndMs;
+              const hasCheckedIn = normalizedStatus === "checkedin";
+              const isWithinCheckoutWindow =
+                hasCheckedIn || (
+                  typeof checkoutWindowStartMs === "number" &&
+                  typeof checkoutWindowEndMs === "number" &&
+                  nowMs >= checkoutWindowStartMs &&
+                  nowMs <= checkoutWindowEndMs
+                );
+              const checkinWindowLabel = formatWindowLabel(checkinWindowStartMs, checkinWindowEndMs);
+              const checkoutWindowLabel = formatWindowLabel(checkoutWindowStartMs, checkoutWindowEndMs);
+
+              const checkinDisabledBase =
                 !isReservationToday ||
                 isCheckinBusy ||
                 normalizedStatus === "checkedin" ||
                 normalizedStatus === "checkedout";
-              const checkoutDisabled =
+              const checkinDisabled = checkinDisabledBase || !isWithinCheckinWindow;
+              const checkoutDisabledBase =
                 !isReservationToday ||
                 isCheckoutBusy ||
                 isCheckinBusy ||
                 normalizedStatus === "checkedout";
-              const checkinTitle = checkinDisabled && !isReservationToday
-                ? "Check-in is only available on the reservation day."
-                : undefined;
-              const checkoutTitle = checkoutDisabled && !isReservationToday
-                ? "Check-out is only available on the reservation day."
-                : undefined;
+              const checkoutDisabled = checkoutDisabledBase || !isWithinCheckoutWindow;
+
+              const checkinTitle = (() => {
+                if (!checkinDisabled) return undefined;
+                if (!isReservationToday) return "Check-in is only available on the reservation day.";
+                if (normalizedStatus === "checkedout") return "This reservation is already checked out.";
+                if (normalizedStatus === "checkedin") return "You are already checked in.";
+                if (isCheckinBusy) return "Processing your check-in...";
+                if (!isWithinCheckinWindow) {
+                  return checkinWindowLabel
+                    ? `Check-in available between ${checkinWindowLabel} (TR time).`
+                    : "Check-in opens closer to your booking time.";
+                }
+                return undefined;
+              })();
+
+              const checkoutTitle = (() => {
+                if (!checkoutDisabled) return undefined;
+                if (!isReservationToday) return "Check-out is only available on the reservation day.";
+                if (normalizedStatus === "checkedout") return "This reservation is already checked out.";
+                if (isCheckoutBusy) return "Processing your check-out...";
+                if (isCheckinBusy) return "Finish check-in before checking out.";
+                if (!isWithinCheckoutWindow) {
+                  return checkoutWindowLabel
+                    ? `Check-out available between ${checkoutWindowLabel} (TR time).`
+                    : "Check-out opens later in your booking.";
+                }
+                return undefined;
+              })();
+
               const actionMessage = (() => {
                 if (!isReservationToday) {
                   const dayLabel = formatDateInTR(reservation.bookingStart);
@@ -1272,7 +1385,18 @@ export default function Floor() {
                   return "This reservation is already checked out.";
                 }
                 if (normalizedStatus === "checkedin") {
+                  if (!isWithinCheckoutWindow && checkoutWindowLabel) {
+                    return `Check-out window: ${checkoutWindowLabel} (TR time).`;
+                  }
                   return "Checked in – have a great day on site.";
+                }
+                if (!isWithinCheckinWindow) {
+                  return checkinWindowLabel
+                    ? `Check-in window: ${checkinWindowLabel} (TR time).`
+                    : "Check-in becomes available closer to your booking time.";
+                }
+                if (!isWithinCheckoutWindow && checkoutWindowLabel) {
+                  return `Check-out window: ${checkoutWindowLabel} (TR time).`;
                 }
                 return "Check in on arrival so colleagues see this desk in use.";
               })();
