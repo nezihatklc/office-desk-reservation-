@@ -686,6 +686,7 @@ export default function AdminNotifications() {
         bookingStart: reservation.bookingStart,
         bookingEnd: reservation.bookingEnd,
         recordedAt: new Date().toISOString(),
+        reason: "admin",
       });
 
       setReservations((prev) => prev.filter((entry) => entry.bookingId !== reservation.bookingId));
