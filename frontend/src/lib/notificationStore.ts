@@ -3,6 +3,8 @@ export const ADMIN_UNREAD_FLAG_KEY = "notifications:admin:lastUnread";
 const CANCELLATION_STORE_KEY = "notifications:cancellations";
 const CHECKOUT_STORE_KEY = "notifications:checkouts";
 
+export type CancellationReason = "admin" | "auto-missed-checkin" | "user";
+
 export type CancellationRecord = {
   bookingId: number;
   userId: number;
@@ -11,6 +13,7 @@ export type CancellationRecord = {
   bookingStart: string;
   bookingEnd: string;
   recordedAt: string;
+  reason?: CancellationReason;
 };
 
 export type CheckoutRecord = CancellationRecord & {
