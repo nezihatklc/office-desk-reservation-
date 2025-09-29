@@ -36,19 +36,35 @@ import { addCheckoutRecord, loadCancellationRecords } from "../lib/notificationS
 const WORK_START = "09:00";
 const WORK_END = "18:00";
 const STEP_MINUTES = 1;
+const CHECKIN_EXPIRY_MINUTES = 60;
+const MINUTE_IN_MS = 60_000;
 const CHECKIN_WINDOW_BEFORE_MINUTES = 30;
 const CHECKIN_WINDOW_AFTER_MINUTES = 30;
 const CHECKOUT_WINDOW_BEFORE_MINUTES = 30;
 const CHECKOUT_WINDOW_AFTER_MINUTES = 60;
 const NOW_REFRESH_INTERVAL_MS = 30_000;
-const MINUTE_IN_MS = 60_000;
 
 const INACTIVE_RESERVATION_STATUSES = new Set(["checkedout", "cancelled", "completed"]);
 
-function isReservationActive(reservation: Reservation): boolean {
+function hasCheckinExpired(reservation: Reservation, referenceMs: number): boolean {
   const status = reservation.status?.trim().toLowerCase();
-  if (!status) return true;
-  return !INACTIVE_RESERVATION_STATUSES.has(status);
+  if (status === "checkedin") return false;
+  if (status && INACTIVE_RESERVATION_STATUSES.has(status)) return true;
+
+  const startMs = new Date(reservation.bookingStart).getTime();
+  if (Number.isNaN(startMs)) return false;
+
+  return referenceMs > startMs + CHECKIN_EXPIRY_MINUTES * MINUTE_IN_MS;
+}
+
+function isReservationActive(reservation: Reservation, referenceMs: number): boolean {
+  const status = reservation.status?.trim().toLowerCase();
+  if (!status) {
+    return !hasCheckinExpired(reservation, referenceMs);
+  }
+  if (INACTIVE_RESERVATION_STATUSES.has(status)) return false;
+  if (status === "checkedin") return true;
+  return !hasCheckinExpired(reservation, referenceMs);
 }
 
 const parseLocalDate = (value: string): Date => {
@@ -228,7 +244,7 @@ export default function Floor() {
   const reservationsByDesk = useMemo(() => {
     const map = new Map<number, Reservation[]>();
     reservations.forEach((reservation) => {
-      if (!isReservationActive(reservation)) return;
+      if (!isReservationActive(reservation, nowMs)) return;
       const startIso = reservation.bookingStart ?? "";
       if (!startIso.startsWith(date)) return;
 
@@ -243,7 +259,7 @@ export default function Floor() {
     );
 
     return map;
-  }, [reservations, date]);
+  }, [reservations, date, nowMs]);
 
   const facilityLookup = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -362,11 +378,16 @@ export default function Floor() {
       const facilityKeys = facilityLabels.map((label) => label.toLowerCase());
 
       if (deskId) {
-        const mine = reservationsForDesk.some((reservation) => reservation.userId === currentUserId);
-        const others = reservationsForDesk.some((reservation) => reservation.userId !== currentUserId);
+        const mine = reservationsForDesk.some(
+          (reservation) => !hasCheckinExpired(reservation, nowMs) && reservation.userId === currentUserId
+        );
+        const others = reservationsForDesk.some(
+          (reservation) => !hasCheckinExpired(reservation, nowMs) && reservation.userId !== currentUserId
+        );
 
         if (mine) status = "byMe";
         else if (others) status = "booked";
+        else status = "available";
       }
 
       return {
@@ -394,6 +415,7 @@ export default function Floor() {
     reservationsByDesk,
     currentUserId,
     facilityLookup,
+    nowMs,
   ]);
 
   const selectedDesk = useMemo(
@@ -534,7 +556,7 @@ export default function Floor() {
     const counter = new Map<number, { count: number; label: string; workspaceName?: string | null }>();
 
     reservations.forEach((reservation) => {
-      if (!isReservationActive(reservation)) {
+      if (!isReservationActive(reservation, nowMs)) {
         return;
       }
 
@@ -579,55 +601,6 @@ export default function Floor() {
       : null;
   }, [reservations, currentUserId, deskSummaryById]);
 
-  const heroMetrics = useMemo(() => {
-    const scheduleDescriptor = selectedDateBanner || "the selected date";
-
-    const metrics: MetricCardProps[] = [
-      {
-        label: "Total desks",
-        value: summaryMetrics.total,
-        accent: "#003a5d",
-        description: "Active across every workspace zone on this floor plan.",
-      },
-      {
-        label: "Available today",
-        value: summaryMetrics.available,
-        accent: "#2EBD85",
-        description: `Free to reserve for ${scheduleDescriptor}.`,
-      },
-      {
-        label: "Booked by others",
-        value: summaryMetrics.others,
-        accent: "#f87171",
-        description: `Reserved by colleagues for ${scheduleDescriptor}.`,
-      },
-      {
-        label: "Mine",
-        value: summaryMetrics.mine,
-        accent: "#69a7ff",
-        description: "Your confirmed reservations in this window.",
-      },
-    ];
-
-    if (mostUsedDesk) {
-      const usageSnippet = `Reserved ${mostUsedDesk.count} ${
-        mostUsedDesk.count === 1 ? "time" : "times"
-      } recently`;
-      const zoneSnippet = mostUsedDesk.workspaceName
-        ? `Located in ${mostUsedDesk.workspaceName}`
-        : null;
-
-      metrics.push({
-        label: "Most used desk",
-        value: mostUsedDesk.label,
-        accent: "#7F5AF0",
-        description: zoneSnippet ? `${usageSnippet} · ${zoneSnippet}` : usageSnippet,
-      });
-    }
-
-    return metrics;
-  }, [summaryMetrics, mostUsedDesk, selectedDateBanner]);
-
   const heroChips = useMemo(() => {
     const chips: string[] = [];
     const zoneLabel = selectedDesk?.workspace ?? mostUsedDesk?.workspaceName ?? activeWorkspace;
@@ -652,14 +625,103 @@ export default function Floor() {
     const target = date;
     return reservations
       .filter((reservation) => reservation.userId === currentUserId)
-      .filter((reservation) => isReservationActive(reservation))
+      .filter((reservation) => isReservationActive(reservation, nowMs))
       .filter((reservation) => {
         const start = reservation.bookingStart ?? "";
         if (!start) return false;
         return start.startsWith(target);
       })
       .sort((a, b) => a.bookingStart.localeCompare(b.bookingStart));
-  }, [reservations, currentUserId, date]);
+  }, [reservations, currentUserId, date, nowMs]);
+
+  const reservationStatusMetrics = useMemo<MetricCardProps[]>(() => {
+    if (myReservationsForSelectedDate.length === 0) return [];
+
+    const tally = new Map<string, { count: number; label: string; emoji: string; accent: string }>();
+
+    const resolveMeta = (normalized?: string | null) => {
+      switch (normalized) {
+        case "checkedin":
+          return { key: "checkedin", label: "Checked-in", emoji: "✅", accent: "#69a7ff" };
+        case "checkedout":
+          return { key: "checkedout", label: "Checked-out", emoji: "👋🏻", accent: "#7F5AF0" };
+        case "cancelled":
+          return { key: "cancelled", label: "Cancelled", emoji: "❌", accent: "#f87171" };
+        case "pending":
+          return { key: "pending", label: "Pending", emoji: "⏳", accent: "#fbbf24" };
+        case "confirmed":
+        case undefined:
+        case null:
+          return { key: "confirmed", label: "Confirmed", emoji: "⏳", accent: "#34d399" };
+        default:
+          return { key: normalized ?? "confirmed", label: "Confirmed", emoji: "⏳", accent: "#34d399" };
+      }
+    };
+
+    myReservationsForSelectedDate.forEach((reservation) => {
+      const normalized = reservation.status?.trim().toLowerCase();
+      const meta = resolveMeta(normalized);
+      const existing = tally.get(meta.key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        tally.set(meta.key, { count: 1, label: meta.label, emoji: meta.emoji, accent: meta.accent });
+      }
+    });
+
+    return Array.from(tally.values()).map(({ count, label, emoji, accent }) => ({
+      label,
+      value: `${count} ${emoji}`,
+      accent,
+      description: count === 1
+        ? `You have 1 ${label.toLowerCase()} reservation.`
+        : `You have ${count} ${label.toLowerCase()} reservations.`,
+    }));
+  }, [myReservationsForSelectedDate]);
+
+  const heroMetrics = useMemo(() => {
+    const scheduleDescriptor = selectedDateBanner || "the selected date";
+
+    const metrics: MetricCardProps[] = [
+      {
+        label: "Total desks",
+        value: summaryMetrics.total,
+        accent: "#003a5d",
+        description: "Active across every workspace zone on this floor plan.",
+      },
+      {
+        label: "Available today",
+        value: summaryMetrics.available,
+        accent: "#2EBD85",
+        description: `Free to reserve for ${scheduleDescriptor}.`,
+      },
+      {
+        label: "Booked by others",
+        value: summaryMetrics.others,
+        accent: "#f87171",
+        description: `Reserved by colleagues for ${scheduleDescriptor}.`,
+      },
+      ...reservationStatusMetrics,
+    ];
+
+    if (mostUsedDesk) {
+      const usageSnippet = `Reserved ${mostUsedDesk.count} ${
+        mostUsedDesk.count === 1 ? "time" : "times"
+      } recently`;
+      const zoneSnippet = mostUsedDesk.workspaceName
+        ? `Located in ${mostUsedDesk.workspaceName}`
+        : null;
+
+      metrics.push({
+        label: "Most used desk",
+        value: mostUsedDesk.label,
+        accent: "#7F5AF0",
+        description: zoneSnippet ? `${usageSnippet} · ${zoneSnippet}` : usageSnippet,
+      });
+    }
+
+    return metrics;
+  }, [summaryMetrics, selectedDateBanner, reservationStatusMetrics, mostUsedDesk]);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -1293,15 +1355,19 @@ export default function Floor() {
               const statusLabel = (() => {
                 switch (normalizedStatus) {
                   case "checkedin":
-                    return "Checked in";
+                    return "Checked-in ✅";
                   case "checkedout":
-                    return "Checked out";
-                  case "confirmed":
-                    return "Confirmed";
+                    return "Checked-out 👋🏻";
+                  case "cancelled":
+                    return "Cancelled ❌";
                   case "pending":
-                    return "Pending";
+                    return "Pending ⏳";
+                  case "confirmed":
+                  case undefined:
+                  case null:
+                    return "Confirmed ⏳";
                   default:
-                    return null;
+                    return `${normalizedStatus.charAt(0).toUpperCase()}${normalizedStatus.slice(1)} ⏳`;
                 }
               })();
 
@@ -1334,6 +1400,19 @@ export default function Floor() {
                 );
               const checkinWindowLabel = formatWindowLabel(checkinWindowStartMs, checkinWindowEndMs);
               const checkoutWindowLabel = formatWindowLabel(checkoutWindowStartMs, checkoutWindowEndMs);
+              const windowDetails: Array<{ kind: "checkin" | "checkout"; text: string }> = [];
+              if (checkinWindowLabel && normalizedStatus !== "checkedout") {
+                windowDetails.push({
+                  kind: "checkin",
+                  text: `${isWithinCheckinWindow ? "Check-in window open" : "Check-in window"}: ${checkinWindowLabel} (TR time).`,
+                });
+              }
+              if (checkoutWindowLabel && normalizedStatus !== "checkedout") {
+                windowDetails.push({
+                  kind: "checkout",
+                  text: `${isWithinCheckoutWindow ? "Check-out window open" : "Check-out window"}: ${checkoutWindowLabel} (TR time).`,
+                });
+              }
 
               const checkinDisabledBase =
                 !isReservationToday ||
@@ -1385,20 +1464,20 @@ export default function Floor() {
                   return "This reservation is already checked out.";
                 }
                 if (normalizedStatus === "checkedin") {
-                  if (!isWithinCheckoutWindow && checkoutWindowLabel) {
-                    return `Check-out window: ${checkoutWindowLabel} (TR time).`;
-                  }
-                  return "Checked in – have a great day on site.";
+                  const parts = ["Checked in – have a great day on site."];
+                  windowDetails
+                    .filter((detail) => detail.kind === "checkout")
+                    .forEach((detail) => parts.push(detail.text));
+                  return parts.join(" ");
                 }
+                const parts: string[] = [];
                 if (!isWithinCheckinWindow) {
-                  return checkinWindowLabel
-                    ? `Check-in window: ${checkinWindowLabel} (TR time).`
-                    : "Check-in becomes available closer to your booking time.";
+                  parts.push("You're booked—check-in unlocks soon.");
+                } else {
+                  parts.push("Check in on arrival so colleagues see this desk in use.");
                 }
-                if (!isWithinCheckoutWindow && checkoutWindowLabel) {
-                  return `Check-out window: ${checkoutWindowLabel} (TR time).`;
-                }
-                return "Check in on arrival so colleagues see this desk in use.";
+                windowDetails.forEach((detail) => parts.push(detail.text));
+                return parts.join(" ");
               })();
 
               return (
