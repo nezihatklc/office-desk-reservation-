@@ -1,5 +1,6 @@
 using backend.Data;
 using backend.Models;
+using backend.Services;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -69,22 +70,28 @@ namespace backend.Repositories
 
         public async Task<bool> HasOverlapAsync(int deskId, DateTime start, DateTime end)
         {
-            return await _context.Bookings.AnyAsync(b =>
-                b.DeskId == deskId &&
-                ((start >= b.BookingStart && start < b.BookingEnd) ||
-                 (end > b.BookingStart && end <= b.BookingEnd) ||
-                 (start <= b.BookingStart && end >= b.BookingEnd))
-            );
+            var candidates = await _context.Bookings
+                .Where(b => b.DeskId == deskId &&
+                    ((start >= b.BookingStart && start < b.BookingEnd) ||
+                     (end > b.BookingStart && end <= b.BookingEnd) ||
+                     (start <= b.BookingStart && end >= b.BookingEnd)))
+                .ToListAsync();
+
+            var nowUtc = DateTime.UtcNow;
+            return candidates.Any(b => IsBookingActive(b, nowUtc));
         }
 
         public async Task<bool> UserHasOverlapAsync(int userId, DateTime start, DateTime end)
         {
-            return await _context.Bookings.AnyAsync(b =>
-                b.UserId == userId &&
-                ((start >= b.BookingStart && start < b.BookingEnd) ||
-                 (end > b.BookingStart && end <= b.BookingEnd) ||
-                 (start <= b.BookingStart && end >= b.BookingEnd))
-            );
+            var candidates = await _context.Bookings
+                .Where(b => b.UserId == userId &&
+                    ((start >= b.BookingStart && start < b.BookingEnd) ||
+                     (end > b.BookingStart && end <= b.BookingEnd) ||
+                     (start <= b.BookingStart && end >= b.BookingEnd)))
+                .ToListAsync();
+
+            var nowUtc = DateTime.UtcNow;
+            return candidates.Any(b => IsBookingActive(b, nowUtc));
         }
 
         public async Task SetStatusAsync(Booking booking, string status, CancellationToken cancellationToken = default)
@@ -103,5 +110,44 @@ namespace backend.Repositories
 
             await _context.SaveChangesAsync(cancellationToken);
         }
+
+        private static readonly HashSet<string> InactiveStatuses = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "checkedout",
+            "cancelled",
+            "completed",
+        };
+
+        private static bool IsBookingActive(Booking booking, DateTime referenceUtc)
+        {
+            var status = booking.Status?.Trim();
+            if (string.IsNullOrEmpty(status))
+            {
+                var checkinDeadline = NormalizeToUtc(booking.BookingStart)
+                    .AddMinutes(BookingPolicies.CheckinGraceMinutes);
+                return referenceUtc <= checkinDeadline;
+            }
+
+            if (status.Equals("CheckedIn", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (InactiveStatuses.Contains(status))
+            {
+                return false;
+            }
+
+            var checkinDeadlineWithStatus = NormalizeToUtc(booking.BookingStart)
+                .AddMinutes(BookingPolicies.CheckinGraceMinutes);
+            return referenceUtc <= checkinDeadlineWithStatus;
+        }
+
+        private static DateTime NormalizeToUtc(DateTime value) => value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Local => value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc)
+        };
     }
 }
