@@ -419,15 +419,15 @@ export default function Admin() {
     const normalized = status?.trim().toLowerCase();
     switch (normalized) {
       case "checkedin":
-        return "Checked in";
+        return "Checked-in ✅";
       case "checkedout":
-        return "Checked out";
-      case "pending":
-        return "Pending";
+        return "Checked-out 👋🏻";
       case "cancelled":
-        return "Cancelled";
+        return "Cancelled ❌";
+      case "pending":
+        return "Pending ⏳";
       default:
-        return "Confirmed";
+        return "Confirmed ⏳";
     }
   }, []);
 
@@ -950,10 +950,6 @@ export default function Admin() {
                   <p className="desk-insight__status-note">{statusMeta.helper}</p>
 
                   <dl className="desk-insight__stats">
-                    <div>
-                      <dt>Capacity</dt>
-                      <dd>{selectedDesk.seats}</dd>
-                    </div>
                     <div>
                       <dt>Bookings today</dt>
                       <dd>{reservationsForDesk.length}</dd>
