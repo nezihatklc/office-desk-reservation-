@@ -237,7 +237,7 @@
   gap: clamp(16px, 2.4vw, 32px);
   align-items: stretch; /* ✅ equal height */
 }
-@media (max-width: 1200px) {
+@media (max-width: 1040px) {
   .page-grid { grid-template-columns: 1fr; }
 }
 
