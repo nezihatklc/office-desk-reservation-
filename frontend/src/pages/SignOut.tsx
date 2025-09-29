@@ -1,18 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import logo from "../assets/dfds-logo.png";
-
 export default function SignOut() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const didSignOutRef = useRef(false);
+  const [showNotice, setShowNotice] = useState(false);
 
   useEffect(() => {
     if (!didSignOutRef.current) {
       didSignOutRef.current = true;
       signOut();
-      window.alert("You are being signed out and will be redirected to the login page in a few seconds.");
+      setShowNotice(true);
     }
 
     const timer = window.setTimeout(() => {
@@ -23,13 +22,33 @@ export default function SignOut() {
   }, [navigate, signOut]);
 
   return (
-    <div className="auth-page">
-      <div className="card auth-card">
-        <img src={logo} alt="Company Logo" className="login-logo" />
-        <br />
-        <h2 className="auth-title">Signing you out…</h2>
-        <p className="muted auth-hint">We’re getting things ready. You’ll be back on the login page shortly.</p>
-      </div>
+    <div className="signout-page">
+      {showNotice && (
+        <div className="signout-notice__backdrop" role="alertdialog" aria-modal="true">
+          <div className="signout-notice__dialog">
+            <h3>See you soon!</h3>
+            <p>You have been signed out and will be redirected to the login page in a few seconds.</p>
+            <div className="signout-notice__actions">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  navigate(-1);
+                }}
+              >
+                Stay here
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => navigate("/login", { replace: true })}
+              >
+                Go to login now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
