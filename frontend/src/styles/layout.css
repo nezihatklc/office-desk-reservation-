@@ -2786,6 +2786,58 @@ aside.col { gap: 18px !important; }
   gap: 0.5rem;
 }
 
+.signout-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0b2845 0%, #0b1d35 100%);
+}
+
+.signout-notice__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 28, 48, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.signout-notice__dialog {
+  background: var(--colors-surface-primary);
+  color: var(--colors-text-dark-primary);
+  border-radius: var(--radius-lg);
+  padding: clamp(20px, 3vw, 36px);
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  display: grid;
+  gap: 16px;
+}
+
+.signout-notice__dialog h3 {
+  font-size: clamp(1.2rem, 1.05rem + 0.5vw, 1.4rem);
+  font-weight: 700;
+  margin: 0;
+  color: var(--colors-primary-main);
+}
+
+.signout-notice__dialog p {
+  margin: 0;
+  line-height: 1.5;
+  color: rgba(12, 28, 48, 0.75);
+}
+
+.signout-notice__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.signout-notice__actions .btn {
+  flex: 1 1 0;
+}
+
 .notifications-empty {
   padding: 1.1rem 1.4rem;
   border-radius: 16px;
