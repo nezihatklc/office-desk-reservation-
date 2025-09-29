@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import logo from "../assets/dfds-logo.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isDev = import.meta.env.DEV;
+const AUTO_REDIRECT_SECONDS = 5;
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -14,8 +15,10 @@ export default function ForgotPassword() {
   const [devToken, setDevToken] = useState<string | undefined>();
   const [devResetUrl, setDevResetUrl] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [redirectSeconds, setRedirectSeconds] = useState<number | null>(null);
 
   const { forgotPassword } = useAuth();
+  const navigate = useNavigate();
 
   const emailValid = emailRegex.test(email.trim());
 
@@ -27,11 +30,13 @@ export default function ForgotPassword() {
     setMessage(null);
     setDevToken(undefined);
     setDevResetUrl(undefined);
+    setRedirectSeconds(null);
     setIsSubmitting(true);
 
     try {
+      const trimmedEmail = email.trim();
       const { error: err, message: serverMessage, devToken, devResetUrl } = await forgotPassword(
-        email.trim()
+        trimmedEmail
       );
 
       if (err) {
@@ -40,11 +45,28 @@ export default function ForgotPassword() {
         setMessage(serverMessage ?? "If the email exists in our system, a reset link has been sent.");
         setDevToken(devToken);
         setDevResetUrl(devResetUrl);
+        setRedirectSeconds(AUTO_REDIRECT_SECONDS);
       }
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    if (redirectSeconds === null) return undefined;
+    if (redirectSeconds <= 0) {
+      const trimmedEmail = email.trim();
+      const search = trimmedEmail ? `?email=${encodeURIComponent(trimmedEmail)}` : "";
+      navigate(`/reset-password${search}`, { replace: false });
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      setRedirectSeconds((prev) => (prev === null ? null : prev - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timerId);
+  }, [redirectSeconds, navigate, email]);
 
   return (
     <div className="auth-page">
@@ -59,6 +81,12 @@ export default function ForgotPassword() {
           <div className="form-success" role="status">
             {message}
           </div>
+        )}
+
+        {redirectSeconds !== null && redirectSeconds > 0 && (
+          <p className="muted auth-hint" role="status">
+            Redirecting to the reset form in {redirectSeconds} second{redirectSeconds === 1 ? "" : "s"}…
+          </p>
         )}
 
         {error && (
