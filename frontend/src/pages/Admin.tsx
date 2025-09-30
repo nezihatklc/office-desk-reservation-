@@ -30,6 +30,7 @@ import {
   mapDeskStatus,
   describeFacility,
 } from "../lib/floorUtils";
+import { formatReservationStatus as formatReservationStatusWithEmoji } from "../lib/reservationStatus";
 
 const formatLocalDate = (date: Date): string => {
   const year = date.getFullYear();
@@ -225,7 +226,7 @@ export default function Admin() {
         .flatMap((segment) =>
           segment.includes(" - ") ? segment.split(/\s-\s+/) : [segment]
         )
-        .map((segment) => segment.replace(/^[\-–—]\s*/, "").trim())
+        .map((segment) => segment.replace(/^[–—-]\s*/, "").trim())
         .filter(Boolean);
 
       if (segments.length > 0) {
@@ -413,22 +414,6 @@ export default function Admin() {
     setReservations((prev) =>
       prev.map((entry) => (entry.bookingId === updated.bookingId ? { ...updated } : entry))
     );
-  }, []);
-
-  const formatReservationStatus = useCallback((status: string | null | undefined) => {
-    const normalized = status?.trim().toLowerCase();
-    switch (normalized) {
-      case "checkedin":
-        return "Checked-in ✅";
-      case "checkedout":
-        return "Checked-out 👋🏻";
-      case "cancelled":
-        return "Cancelled ❌";
-      case "pending":
-        return "Pending ⏳";
-      default:
-        return "Confirmed ⏳";
-    }
   }, []);
 
   const requestCheckin = useCallback(
@@ -1178,7 +1163,7 @@ export default function Admin() {
                   const normalizedStatus = reservation.status?.trim().toLowerCase();
                   const isReservationToday =
                     isoDateKeyInTR(reservation.bookingStart) === todayKey;
-                  const statusLabel = formatReservationStatus(reservation.status);
+                  const statusLabel = formatReservationStatusWithEmoji(reservation.status);
                   const isCheckinInFlight = checkinBusyId === reservation.bookingId;
                   const isCheckoutInFlight = checkoutBusyId === reservation.bookingId;
                   const checkinDisabled =
