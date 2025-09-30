@@ -11,7 +11,7 @@ import { addCancellationRecord } from "../lib/notificationStore";
 import { isoToHHMMInTR } from "../lib/floorUtils";
 import { CHECKIN_GRACE_MINUTES } from "../lib/reservationStatus";
 import { formatReservationStatus } from "../lib/reservationStatus";
-import { syncMissedCheckinNotificationsForUser } from "../lib/reservations";
+import { syncReservationNotificationsForUser } from "../lib/reservations";
 
 type TabKey = "upcoming" | "past";
 
@@ -45,7 +45,7 @@ export default function ProfilePage() {
         if (tab === "upcoming") {
           const data = await listUpcomingBookings();
           if (userId) {
-            syncMissedCheckinNotificationsForUser(data, userId);
+            syncReservationNotificationsForUser(data, userId);
           }
           setUpcoming(data.filter((r) => r.userId === userId));
         } else {
