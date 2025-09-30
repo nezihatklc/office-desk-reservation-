@@ -9,6 +9,7 @@ import {
 import API from "../lib/api";
 import { addCancellationRecord } from "../lib/notificationStore";
 import { isoToHHMMInTR } from "../lib/floorUtils";
+import { formatReservationStatus } from "../lib/reservationStatus";
 
 type TabKey = "upcoming" | "past";
 
@@ -137,7 +138,7 @@ export default function ProfilePage() {
                       <div>
                         <span className="reservation-card__desk">{r.deskCode ?? `Desk #${r.deskId}`}</span>
                       </div>
-                      <span className="reservation-card__status">{r.status ?? "Confirmed"}</span>
+                      <span className="reservation-card__status">{formatReservationStatus(r.status)}</span>
                     </header>
                     <dl className="reservation-card__details">
                       <div>
