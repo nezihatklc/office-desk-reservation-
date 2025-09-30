@@ -12,6 +12,8 @@ export type ReservationStatusMeta = {
   accent: string;
 };
 
+export const CHECKIN_GRACE_MINUTES = 60;
+
 const STATUS_META: Record<ReservationStatusKey, Omit<ReservationStatusMeta, "key">> = {
   confirmed: { label: "Confirmed", emoji: "⏳", accent: "#34d399" },
   pending: { label: "Pending", emoji: "⏳", accent: "#fbbf24" },
