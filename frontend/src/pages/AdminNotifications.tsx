@@ -179,6 +179,7 @@ function sameDay(a: Date, b: Date) {
 export default function AdminNotifications() {
   const { user } = useAuth();
   const isAdmin = user?.role?.toLowerCase() === "admin";
+  const currentUserId = user?.userId ?? 0;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -270,7 +271,7 @@ export default function AdminNotifications() {
       setError(null);
       try {
         const [reservationData, workspaceData, deskData, auditLogData] = await Promise.all([
-          getAllReservations(),
+          getAllReservations(currentUserId ? { targetUserId: currentUserId } : undefined),
           listWorkspaces(),
           listDesks(),
           getAuditLogs(),
@@ -335,7 +336,7 @@ export default function AdminNotifications() {
     return () => {
       cancelled = true;
     };
-  }, [isAdmin]);
+  }, [isAdmin, currentUserId]);
 
   useEffect(() => {
     if (!isAdmin) {
