@@ -74,7 +74,7 @@ export default function SeatsOverview() {
     try {
       const [desks, bookings] = await Promise.all([
         listDesks(),
-        getAllReservations(),
+        getAllReservations(currentUserId ? { targetUserId: currentUserId } : undefined),
       ]);
       setDeskSummaries(desks);
       setReservations(bookings);
@@ -82,7 +82,7 @@ export default function SeatsOverview() {
       console.error("Failed to load seat data", err);
       setError("Unable to load seat overview. Please refresh.");
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     void loadData();
