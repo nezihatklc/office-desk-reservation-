@@ -8,7 +8,14 @@ import type {
   BookingCheckinRequest,
   UserResponse,
 } from "./api";
-import { addCancellationRecord, loadCancellationRecords, type CancellationRecord } from "./notificationStore";
+import {
+  addCancellationRecord,
+  addCheckoutRecord,
+  loadCancellationRecords,
+  loadCheckoutRecords,
+  type CancellationRecord,
+  type CheckoutRecord,
+} from "./notificationStore";
 import { CHECKIN_GRACE_MINUTES } from "./reservationStatus";
 
 export type Reservation = Omit<BookingResponse, "user"> & {
@@ -21,6 +28,10 @@ let lastKnownStatuses = new Map<number, string | null>();
 
 const CHECKIN_GRACE_MS = CHECKIN_GRACE_MINUTES * 60_000;
 const MAX_RECORD_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const AUTO_CHECKOUT_PERFORMER_ID = 0;
+const ISTANBUL_TZ = "Europe/Istanbul";
+const AUTO_CHECKOUT_HOUR = 18;
+const AUTO_CHECKOUT_MINUTE = 5;
 
 type SyncOptions = {
   targetUserId?: number;
@@ -45,7 +56,7 @@ export async function getAllReservations(options?: SyncOptions): Promise<Reserva
   try {
     const bookings = await listBookings();
     const reservations = await Promise.all(bookings.map(expandUser));
-    syncMissedCheckinNotifications(reservations, options);
+    syncReservationNotifications(reservations, options);
     return reservations;
   } catch (err) {
     console.error("getAllReservations failed:", err);
@@ -160,6 +171,65 @@ export function fmtRangeEnGB(startISO: string, endISO: string) {
   return { dateLabel, timeLabel };
 }
 
+function getTimeZoneOffset(date: Date, timeZone: string): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+
+  const parts = dtf.formatToParts(date);
+  const filled: Record<string, number> = {};
+  parts.forEach(({ type, value }) => {
+    if (type !== "literal") {
+      filled[type] = Number.parseInt(value, 10);
+    }
+  });
+
+  const utcEstimate = Date.UTC(
+    filled.year ?? date.getUTCFullYear(),
+    (filled.month ?? date.getUTCMonth() + 1) - 1,
+    filled.day ?? date.getUTCDate(),
+    filled.hour ?? date.getUTCHours(),
+    filled.minute ?? date.getUTCMinutes(),
+    filled.second ?? date.getUTCSeconds()
+  );
+
+  return utcEstimate - date.getTime();
+}
+
+function getAutoCheckoutDeadline(reservation: Reservation): number | null {
+  const startMs = Date.parse(reservation.bookingStart);
+  if (Number.isNaN(startMs)) return null;
+
+  const startDate = new Date(startMs);
+  const datePartsFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: ISTANBUL_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  const parts = datePartsFormatter.formatToParts(startDate);
+  const year = Number.parseInt(parts.find((part) => part.type === "year")?.value ?? "", 10);
+  const month = Number.parseInt(parts.find((part) => part.type === "month")?.value ?? "", 10);
+  const day = Number.parseInt(parts.find((part) => part.type === "day")?.value ?? "", 10);
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+
+  const utcGuess = Date.UTC(year, month - 1, day, AUTO_CHECKOUT_HOUR, AUTO_CHECKOUT_MINUTE, 0);
+  const guessDate = new Date(utcGuess);
+  const offset = getTimeZoneOffset(guessDate, ISTANBUL_TZ);
+  return utcGuess - offset;
+}
+
 function shouldRecordMissedCheckin(reservation: Reservation, now: number): boolean {
   const status = reservation.status?.trim().toLowerCase();
   if (status !== "cancelled") return false;
@@ -185,7 +255,46 @@ function buildAutoMissedCheckinRecord(reservation: Reservation, recordedAt: numb
   };
 }
 
-function syncMissedCheckinNotifications(reservations: Reservation[], options?: SyncOptions) {
+function shouldRecordAutoCheckout(
+  reservation: Reservation,
+  previousStatus: string | null,
+  existingCheckoutMap: Map<number, CheckoutRecord>,
+  now: number
+): boolean {
+  const status = reservation.status?.trim().toLowerCase();
+  if (status !== "checkedout") return false;
+  if (existingCheckoutMap.has(reservation.bookingId)) return false;
+  if (previousStatus !== null && previousStatus === "checkedout") return false;
+  const deadline = getAutoCheckoutDeadline(reservation);
+  if (deadline !== null && now < deadline) return false;
+  return true;
+}
+
+function buildAutoCheckoutRecord(reservation: Reservation, recordedAt: number): CheckoutRecord {
+  const occupantName = getReservationDisplayName(reservation);
+
+  return {
+    bookingId: reservation.bookingId,
+    userId: reservation.userId,
+    performedByUserId: AUTO_CHECKOUT_PERFORMER_ID,
+    performedByName: "System",
+    occupantName,
+    deskCode: reservation.deskCode ?? reservation.deskId.toString(),
+    bookingDate: reservation.bookingDate,
+    bookingStart: reservation.bookingStart,
+    bookingEnd: reservation.bookingEnd,
+    recordedAt: new Date(recordedAt).toISOString(),
+  };
+}
+
+function getReservationDisplayName(reservation: Reservation): string | undefined {
+  const first = reservation.user?.firstName?.trim();
+  const last = reservation.user?.lastName?.trim();
+  if (first && last) return `${first} ${last}`;
+  return first || last || reservation.user?.email || undefined;
+}
+
+function syncReservationNotifications(reservations: Reservation[], options?: SyncOptions) {
   if (!reservations.length) return;
 
   const now = options?.now ?? Date.now();
@@ -204,36 +313,42 @@ function syncMissedCheckinNotifications(reservations: Reservation[], options?: S
     existingByBooking.set(record.bookingId, record);
   });
 
+  const existingCheckoutRecords = loadCheckoutRecords();
+  const existingCheckoutByBooking = new Map<number, CheckoutRecord>();
+  existingCheckoutRecords.forEach((record) => {
+    existingCheckoutByBooking.set(record.bookingId, record);
+  });
+
   const updatedStatuses = new Map(lastKnownStatuses);
 
   relevant.forEach((reservation) => {
     const normalizedStatus = reservation.status?.trim().toLowerCase() ?? null;
+    const previousStatus = lastKnownStatuses.get(reservation.bookingId) ?? null;
     updatedStatuses.set(reservation.bookingId, normalizedStatus);
 
     if (!shouldRecordMissedCheckin(reservation, now)) {
-      return;
+      // carry on to evaluate checkout notifications
+    } else if (!existingByBooking.has(reservation.bookingId)) {
+      const startMs = Date.parse(reservation.bookingStart);
+      if (!Number.isNaN(startMs)) {
+        const recordedAt = Math.max(startMs + CHECKIN_GRACE_MS, startMs);
+        const record = buildAutoMissedCheckinRecord(reservation, recordedAt);
+        addCancellationRecord(record);
+        existingByBooking.set(reservation.bookingId, record);
+      }
     }
 
-    if (existingByBooking.has(reservation.bookingId)) {
-      return;
+    if (shouldRecordAutoCheckout(reservation, previousStatus, existingCheckoutByBooking, now)) {
+      const record = buildAutoCheckoutRecord(reservation, now);
+      addCheckoutRecord(record);
+      existingCheckoutByBooking.set(reservation.bookingId, record);
     }
-
-    const startMs = Date.parse(reservation.bookingStart);
-    if (Number.isNaN(startMs)) {
-      return;
-    }
-
-    const recordedAt = Math.max(startMs + CHECKIN_GRACE_MS, startMs);
-
-    const record = buildAutoMissedCheckinRecord(reservation, recordedAt);
-    addCancellationRecord(record);
-    existingByBooking.set(reservation.bookingId, record);
   });
 
   lastKnownStatuses = updatedStatuses;
 }
 
-export function syncMissedCheckinNotificationsForUser(
+export function syncReservationNotificationsForUser(
   bookings: BookingResponse[],
   userId: number,
   options?: { now?: number }
@@ -247,5 +362,5 @@ export function syncMissedCheckinNotificationsForUser(
 
   if (!reservations.length) return;
 
-  syncMissedCheckinNotifications(reservations, { targetUserId: userId, now: options?.now });
+  syncReservationNotifications(reservations, { targetUserId: userId, now: options?.now });
 }
