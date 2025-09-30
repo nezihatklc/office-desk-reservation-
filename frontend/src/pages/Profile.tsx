@@ -9,7 +9,9 @@ import {
 import API from "../lib/api";
 import { addCancellationRecord } from "../lib/notificationStore";
 import { isoToHHMMInTR } from "../lib/floorUtils";
+import { CHECKIN_GRACE_MINUTES } from "../lib/reservationStatus";
 import { formatReservationStatus } from "../lib/reservationStatus";
+import { syncMissedCheckinNotificationsForUser } from "../lib/reservations";
 
 type TabKey = "upcoming" | "past";
 
@@ -23,6 +25,17 @@ export default function ProfilePage() {
   const [past, setPast] = useState<AuditLogResponse[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const hasCheckinExpired = (reservation: BookingResponse): boolean => {
+    const status = reservation.status?.trim().toLowerCase();
+    if (status === "checkedin") return false;
+    if (status && ["checkedout", "cancelled", "completed"].includes(status)) return true;
+
+    const startMs = new Date(reservation.bookingStart).getTime();
+    if (Number.isNaN(startMs)) return false;
+
+    return Date.now() > startMs + CHECKIN_GRACE_MINUTES * 60_000;
+  };
+
   // Load reservations from backend
   useEffect(() => {
     (async () => {
@@ -31,6 +44,9 @@ export default function ProfilePage() {
       try {
         if (tab === "upcoming") {
           const data = await listUpcomingBookings();
+          if (userId) {
+            syncMissedCheckinNotificationsForUser(data, userId);
+          }
           setUpcoming(data.filter((r) => r.userId === userId));
         } else {
           const data = await listPastBookings();
@@ -154,7 +170,7 @@ export default function ProfilePage() {
                       <button
                         className="btn btn-danger"
                         onClick={() => cancelBooking(r.bookingId)}
-                        disabled={loading}
+                        disabled={loading || hasCheckinExpired(r)}
                       >
                         {loading ? "Cancelling…" : "Cancel reservation"}
                       </button>
