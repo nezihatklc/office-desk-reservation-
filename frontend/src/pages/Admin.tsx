@@ -45,6 +45,7 @@ const parseLocalDate = (value: string): Date => {
 };
 
 const CHECKIN_EXPIRY_MINUTES = 60;
+const CHECKIN_WINDOW_AFTER_MINUTES = 30;
 const NOW_REFRESH_INTERVAL_MS = 30_000;
 const MINUTE_IN_MS = 60_000;
 const MAX_RECENT_BOOKINGS = 12;
@@ -103,6 +104,7 @@ type AdminConfirmAction = {
 
 export default function Admin() {
   const { user } = useAuth();
+  const currentUserId = user?.userId ?? 0;
   const [deskSummaries, setDeskSummaries] = useState<DeskSummary[]>([]);
   const [facilityCatalog, setFacilityCatalog] = useState<FacilityResponse[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -144,7 +146,7 @@ export default function Admin() {
       setIsLoading(true);
       const [desks, bookings, facilities, workspaces] = await Promise.all([
         listDesks(),
-        getAllReservations(),
+        getAllReservations(currentUserId ? { targetUserId: currentUserId } : undefined),
         listFacilities(),
         listWorkspaces(),
       ]);
@@ -167,7 +169,7 @@ export default function Admin() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     void loadData();
@@ -283,24 +285,58 @@ export default function Admin() {
       const status = reservation.status?.trim().toLowerCase();
       if (status === "checkedin") checkedIn += 1;
       else if (status === "checkedout") checkedOut += 1;
-      else pending += 1;
+      else if (status && INACTIVE_RESERVATION_STATUSES.has(status)) {
+        // reservation already cancelled/completed – ignore for awaiting arrival
+      } else if (!hasCheckinExpired(reservation, nowMs)) {
+        pending += 1;
+      }
     });
 
     return { total, checkedIn, checkedOut, pending };
-  }, [todaysReservations]);
+  }, [todaysReservations, nowMs]);
 
   const overdueCheckins = useMemo(() => {
     const now = nowMs;
     return todaysReservations
       .filter((reservation) => {
         const status = reservation.status?.trim().toLowerCase();
-        if (status === "checkedin" || status === "checkedout") return false;
+        if (status === "checkedin" || status === "checkedout" || status === "cancelled") return false;
         const startTime = new Date(reservation.bookingStart).getTime();
         if (Number.isNaN(startTime)) return false;
-        return startTime < now;
+        return startTime + CHECKIN_WINDOW_AFTER_MINUTES * 60_000 < now;
       })
       .sort((a, b) => a.bookingStart.localeCompare(b.bookingStart));
   }, [todaysReservations, nowMs]);
+
+  const attendanceHighlights = useMemo(
+    () => [
+      {
+        key: "total" as const,
+        label: "Booked desks",
+        value: attendanceSummary.total,
+        note: "Confirmed reservations today",
+      },
+      {
+        key: "checkedin" as const,
+        label: "Checked in",
+        value: attendanceSummary.checkedIn,
+        note: "Currently on site",
+      },
+      {
+        key: "checkedout" as const,
+        label: "Checked out",
+        value: attendanceSummary.checkedOut,
+        note: "Finished for the day",
+      },
+      {
+        key: "pending" as const,
+        label: "Awaiting arrival",
+        value: attendanceSummary.pending,
+        note: "Still within the check-in window",
+      },
+    ],
+    [attendanceSummary]
+  );
 
   const workspaceHeat = useMemo(() => {
     const cutoff = new Date();
@@ -825,22 +861,13 @@ export default function Admin() {
           </div>
 
           <div className="attendance-summary">
-            <div>
-              <span className="label">Booked desks</span>
-              <strong>{attendanceSummary.total}</strong>
-            </div>
-            <div>
-              <span className="label">Checked in</span>
-              <strong>{attendanceSummary.checkedIn}</strong>
-            </div>
-            <div>
-              <span className="label">Checked out</span>
-              <strong>{attendanceSummary.checkedOut}</strong>
-            </div>
-            <div>
-              <span className="label">Awaiting arrival</span>
-              <strong>{attendanceSummary.pending}</strong>
-            </div>
+            {attendanceHighlights.map((item) => (
+              <article key={item.key} className={`attendance-card attendance-card--${item.key}`}>
+                <span className="attendance-card__label">{item.label}</span>
+                <span className="attendance-card__value">{item.value}</span>
+                <span className="attendance-card__note">{item.note}</span>
+              </article>
+            ))}
           </div>
 
           <div className="attendance-overdue">
@@ -856,14 +883,18 @@ export default function Admin() {
                     ? `${reservation.user.firstName} ${reservation.user.lastName}`.trim()
                     : `User #${reservation.userId}`;
                   return (
-                    <li key={reservation.bookingId}>
-                      <div className="primary">
-                        <strong>{deskLabel}</strong>
-                        <span>{isoToHHMMInTR(reservation.bookingStart)} – {isoToHHMMInTR(reservation.bookingEnd)}</span>
+                    <li key={reservation.bookingId} className="attendance-overdue__item">
+                      <div className="attendance-overdue__slot">
+                        <span className="attendance-overdue__desk">{deskLabel}</span>
+                        <span className="attendance-overdue__time">
+                          {isoToHHMMInTR(reservation.bookingStart)} – {isoToHHMMInTR(reservation.bookingEnd)}
+                        </span>
                       </div>
-                      <div className="secondary">
-                        <span>{occupantLabel}</span>
-                        <span>Start passed — tap actions to follow up.</span>
+                      <div className="attendance-overdue__meta">
+                        <span className="attendance-overdue__occupant">{occupantLabel}</span>
+                        <span className="attendance-overdue__message">
+                          Start time has passed — reach out or adjust their booking.
+                        </span>
                       </div>
                     </li>
                   );
