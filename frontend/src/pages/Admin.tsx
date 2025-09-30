@@ -276,7 +276,10 @@ export default function Admin() {
   );
 
   const attendanceSummary = useMemo(() => {
-    const total = todaysReservations.length;
+    const total = todaysReservations.filter((reservation) => {
+      const status = reservation.status?.trim().toLowerCase();
+      return status !== "cancelled" && status !== "completed";
+    }).length;
     let checkedIn = 0;
     let checkedOut = 0;
     let pending = 0;
