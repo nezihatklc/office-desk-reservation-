@@ -300,8 +300,8 @@ export async function listUpcomingBookings(): Promise<BookingResponse[]> {
   return data;
 }
 
-export async function listPastBookings(): Promise<any[]> {
-  const { data } = await API.get<any[]>("/Bookings/past");
+export async function listPastBookings(): Promise<AuditLogResponse[]> {
+  const { data } = await API.get<AuditLogResponse[]>("/Bookings/past");
   return data;
 }
 
