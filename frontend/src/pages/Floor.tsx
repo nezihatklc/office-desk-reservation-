@@ -202,7 +202,7 @@ export default function Floor() {
     try {
       const [desks, bookings, facilities] = await Promise.all([
         listDesks(),
-        getAllReservations(),
+        getAllReservations(currentUserId ? { targetUserId: currentUserId } : undefined),
         listFacilities(),
       ]);
       setDeskSummaries(desks);
@@ -212,7 +212,7 @@ export default function Floor() {
       console.error("Failed to load floor data", err);
       setError("We could not load the floor information. Please refresh.");
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     void loadFloorData();
