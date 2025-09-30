@@ -626,25 +626,41 @@ export default function Admin() {
   const statusMeta = selectedDesk ? DESK_STATUS_META[selectedDesk.status] : null;
   const reservationsForDesk = selectedDeskDetails.reservations;
 
-  const upcomingDemand = useMemo(() => {
-    const today = new Date();
-    const days: Array<{ label: string; count: number }> = [];
+  type UpcomingDemandItem = {
+    isoDate: string;
+    weekday: string;
+    day: string;
+    month: string;
+    count: number;
+    isToday: boolean;
+    isWeekend: boolean;
+  };
+
+  const upcomingDemand = useMemo<UpcomingDemandItem[]>(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const days: UpcomingDemandItem[] = [];
 
     for (let offset = 0; offset < 7; offset++) {
-      const target = new Date(today);
-      target.setDate(today.getDate() + offset);
+      const target = new Date(now);
+      target.setDate(now.getDate() + offset);
       const isoPrefix = formatLocalDate(target);
-      const count = reservations.filter((reservation) =>
-        (reservation.bookingStart ?? "").startsWith(isoPrefix)
-      ).length;
+      const count = reservations.filter((reservation) => {
+        const start = reservation.bookingStart ?? "";
+        if (!start.startsWith(isoPrefix)) return false;
+        const status = reservation.status?.trim().toLowerCase();
+        if (!status) return true;
+        return status !== "cancelled" && status !== "completed" && status !== "checkedout";
+      }).length;
 
       days.push({
-        label: target.toLocaleDateString("en-GB", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-        }),
+        isoDate: isoPrefix,
+        weekday: target.toLocaleDateString("en-GB", { weekday: "short" }),
+        day: target.toLocaleDateString("en-GB", { day: "2-digit" }),
+        month: target.toLocaleDateString("en-GB", { month: "short" }),
         count,
+        isToday: offset === 0,
+        isWeekend: target.getDay() === 0 || target.getDay() === 6,
       });
     }
 
@@ -1036,12 +1052,25 @@ export default function Admin() {
             <span className="muted">Bookings scheduled for the next 7 days</span>
           </div>
           <ul className="admin-upcoming-list">
-            {upcomingDemand.map(({ label, count }) => (
-              <li key={label}>
-                <span>{label}</span>
-                <strong>{count}</strong>
-              </li>
-            ))}
+            {upcomingDemand.map((day) => {
+              const classes = ["admin-upcoming-card"];
+              if (day.isToday) classes.push("admin-upcoming-card--today");
+              if (day.isWeekend) classes.push("admin-upcoming-card--weekend");
+
+              return (
+                <li key={day.isoDate} className={classes.join(" ")}>
+                  <div className="admin-upcoming-card__date" aria-hidden="true">
+                    <span className="admin-upcoming-card__weekday">{day.weekday}</span>
+                    <span className="admin-upcoming-card__day">{day.day}</span>
+                    <span className="admin-upcoming-card__month">{day.month}</span>
+                  </div>
+                  <div className="admin-upcoming-card__meta">
+                    <span className="admin-upcoming-card__label">Bookings</span>
+                    <span className="admin-upcoming-card__value">{day.count}</span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </section>
@@ -1076,7 +1105,7 @@ export default function Admin() {
                 return (
                   <li key={workspace.workspaceId} className="workspace-team-row">
                     <div className="workspace-team-copy">
-                      <strong>Workspace {workspace.workspaceName}</strong>
+                      <span className="workspace-team-chip">Workspace {workspace.workspaceName}</span>
                       <span className="muted">
                         Desk code {workspace.deskCode} · Capacity {workspace.capacity}
                       </span>
