@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { isAxiosError } from "axios";
 
 // Simple email regex
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -90,11 +91,16 @@ export default function Register() {
       } else {
         nav("/confirm-email-pending", { state: { email: trimmedEmail, confirmCode } });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Registration failed:", err);
-      const backendMsg =
-        err?.response?.data?.error || err?.response?.data?.message;
-      setError(backendMsg || err?.message || "Registration failed.");
+      if (isAxiosError(err)) {
+        const backendMsg = err.response?.data?.error || err.response?.data?.message;
+        setError(backendMsg || err.message || "Registration failed.");
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Registration failed.");
+      }
     } finally {
       setIsLoading(false);
     }
