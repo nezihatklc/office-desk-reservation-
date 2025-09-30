@@ -32,6 +32,7 @@ import {
   describeFacility,
 } from "../lib/floorUtils";
 import { addCheckoutRecord, loadCancellationRecords } from "../lib/notificationStore";
+import { formatReservationStatus, getReservationStatusMeta } from "../lib/reservationStatus";
 
 const WORK_START = "09:00";
 const WORK_END = "18:00";
@@ -276,12 +277,12 @@ export default function Floor() {
     const sanitizeSegment = (segment: string): string => {
       if (!segment) return "";
       let cleaned = segment
-        .replace(/^[\-\u2013\u2014•]\s*/, "")
+        .replace(/^[\u2013\u2014•-]\s*/, "")
         .replace(/\s+/g, " ")
         .trim();
 
       cleaned = cleaned
-        .replace(/^(?:workspace\s*)?[A-Z]{1,2}\s*[-\/]?\s*\d+\s*(?:desk|equipment)?\s*:?/i, "")
+        .replace(/^(?:workspace\s*)?[A-Z]{1,2}\s*(?:[-/]\s*)?\d+\s*(?:desk|equipment)?\s*:?/i, "")
         .trim();
       cleaned = cleaned.replace(/^equipment\s*:?/i, "").trim();
       cleaned = cleaned.replace(/^desk\s*:?/i, "").trim();
@@ -637,35 +638,23 @@ export default function Floor() {
   const reservationStatusMetrics = useMemo<MetricCardProps[]>(() => {
     if (myReservationsForSelectedDate.length === 0) return [];
 
-    const tally = new Map<string, { count: number; label: string; emoji: string; accent: string }>();
-
-    const resolveMeta = (normalized?: string | null) => {
-      switch (normalized) {
-        case "checkedin":
-          return { key: "checkedin", label: "Checked-in", emoji: "✅", accent: "#69a7ff" };
-        case "checkedout":
-          return { key: "checkedout", label: "Checked-out", emoji: "👋🏻", accent: "#7F5AF0" };
-        case "cancelled":
-          return { key: "cancelled", label: "Cancelled", emoji: "❌", accent: "#f87171" };
-        case "pending":
-          return { key: "pending", label: "Pending", emoji: "⏳", accent: "#fbbf24" };
-        case "confirmed":
-        case undefined:
-        case null:
-          return { key: "confirmed", label: "Confirmed", emoji: "⏳", accent: "#34d399" };
-        default:
-          return { key: normalized ?? "confirmed", label: "Confirmed", emoji: "⏳", accent: "#34d399" };
-      }
-    };
+    const tally = new Map<
+      string,
+      { count: number; label: string; emoji: string; accent: string }
+    >();
 
     myReservationsForSelectedDate.forEach((reservation) => {
-      const normalized = reservation.status?.trim().toLowerCase();
-      const meta = resolveMeta(normalized);
+      const meta = getReservationStatusMeta(reservation.status);
       const existing = tally.get(meta.key);
       if (existing) {
         existing.count += 1;
       } else {
-        tally.set(meta.key, { count: 1, label: meta.label, emoji: meta.emoji, accent: meta.accent });
+        tally.set(meta.key, {
+          count: 1,
+          label: meta.label,
+          emoji: meta.emoji,
+          accent: meta.accent,
+        });
       }
     });
 
@@ -673,9 +662,10 @@ export default function Floor() {
       label,
       value: `${count} ${emoji}`,
       accent,
-      description: count === 1
-        ? `You have 1 ${label.toLowerCase()} reservation.`
-        : `You have ${count} ${label.toLowerCase()} reservations.`,
+      description:
+        count === 1
+          ? `You have 1 ${label.toLowerCase()} reservation.`
+          : `You have ${count} ${label.toLowerCase()} reservations.`,
     }));
   }, [myReservationsForSelectedDate]);
 
@@ -894,7 +884,7 @@ export default function Floor() {
 
       const response: DeskSuggestionResponsePayload = await fetchDeskSuggestions(payload);
 
-      let suggestions = [...response.suggestions];
+      const suggestions = [...response.suggestions];
 
       if (mostUsedDesk) {
         const existingIndex = suggestions.findIndex((item) => item.deskId === mostUsedDesk.deskId);
@@ -1352,24 +1342,7 @@ export default function Floor() {
               const isCheckoutBusy = checkoutBusyId === reservation.bookingId;
               const isReservationToday =
                 isoDateKeyInTR(reservation.bookingStart) === today;
-              const statusLabel = (() => {
-                switch (normalizedStatus) {
-                  case "checkedin":
-                    return "Checked-in ✅";
-                  case "checkedout":
-                    return "Checked-out 👋🏻";
-                  case "cancelled":
-                    return "Cancelled ❌";
-                  case "pending":
-                    return "Pending ⏳";
-                  case "confirmed":
-                  case undefined:
-                  case null:
-                    return "Confirmed ⏳";
-                  default:
-                    return `${normalizedStatus.charAt(0).toUpperCase()}${normalizedStatus.slice(1)} ⏳`;
-                }
-              })();
+              const statusLabel = formatReservationStatus(reservation.status);
 
               const startMs = new Date(reservation.bookingStart).getTime();
               const endMs = new Date(reservation.bookingEnd).getTime();
