@@ -38,6 +38,7 @@ builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<DeskRecommendationService>();
 builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
 builder.Services.AddHostedService<MissedCheckinMonitor>();
+builder.Services.AddHostedService<AutoCheckoutMonitor>();
 
 // === CONTROLLERS ===
 builder.Services.AddControllers();
