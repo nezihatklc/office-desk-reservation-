@@ -8,7 +8,8 @@ import type {
   BookingCheckinRequest,
   UserResponse,
 } from "./api";
-import { addCancellationRecord, type CancellationReason } from "./notificationStore";
+import { addCancellationRecord, loadCancellationRecords, type CancellationRecord } from "./notificationStore";
+import { CHECKIN_GRACE_MINUTES } from "./reservationStatus";
 
 export type Reservation = Omit<BookingResponse, "user"> & {
   user?: UserResponse | null;
@@ -17,6 +18,14 @@ export type Reservation = Omit<BookingResponse, "user"> & {
 // cache user lookups if needed in the future
 const userCache = new Map<number, UserResponse>();
 let lastKnownStatuses = new Map<number, string | null>();
+
+const CHECKIN_GRACE_MS = CHECKIN_GRACE_MINUTES * 60_000;
+const MAX_RECORD_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+type SyncOptions = {
+  targetUserId?: number;
+  now?: number;
+};
 
 async function expandUser(b: BookingResponse): Promise<Reservation> {
   if (b.user) {
@@ -32,11 +41,11 @@ async function expandUser(b: BookingResponse): Promise<Reservation> {
 }
 
 // Get all reservations
-export async function getAllReservations(): Promise<Reservation[]> {
+export async function getAllReservations(options?: SyncOptions): Promise<Reservation[]> {
   try {
     const bookings = await listBookings();
     const reservations = await Promise.all(bookings.map(expandUser));
-    trackReservationCancellations(reservations);
+    syncMissedCheckinNotifications(reservations, options);
     return reservations;
   } catch (err) {
     console.error("getAllReservations failed:", err);
@@ -151,33 +160,92 @@ export function fmtRangeEnGB(startISO: string, endISO: string) {
   return { dateLabel, timeLabel };
 }
 
-function trackReservationCancellations(reservations: Reservation[]) {
-  const nextStatuses = new Map<number, string | null>();
+function shouldRecordMissedCheckin(reservation: Reservation, now: number): boolean {
+  const status = reservation.status?.trim().toLowerCase();
+  if (status !== "cancelled") return false;
 
-  reservations.forEach((reservation) => {
-    const normalizedStatus = reservation.status?.trim().toLowerCase() ?? null;
-    const previousStatus = lastKnownStatuses.get(reservation.bookingId);
+  const startMs = Date.parse(reservation.bookingStart);
+  if (Number.isNaN(startMs)) return false;
 
-    if (
-      normalizedStatus === "cancelled" &&
-      previousStatus !== undefined &&
-      previousStatus !== "cancelled"
-    ) {
-      const reason: CancellationReason = "auto-missed-checkin";
-      addCancellationRecord({
-        bookingId: reservation.bookingId,
-        userId: reservation.userId,
-        deskCode: reservation.deskCode ?? reservation.deskId.toString(),
-        bookingDate: reservation.bookingDate,
-        bookingStart: reservation.bookingStart,
-        bookingEnd: reservation.bookingEnd,
-        recordedAt: new Date().toISOString(),
-        reason,
-      });
-    }
+  if (now - startMs > MAX_RECORD_AGE_MS) return false;
 
-    nextStatuses.set(reservation.bookingId, normalizedStatus);
+  return now >= startMs + CHECKIN_GRACE_MS;
+}
+
+function buildAutoMissedCheckinRecord(reservation: Reservation, recordedAt: number): CancellationRecord {
+  return {
+    bookingId: reservation.bookingId,
+    userId: reservation.userId,
+    deskCode: reservation.deskCode ?? reservation.deskId.toString(),
+    bookingDate: reservation.bookingDate,
+    bookingStart: reservation.bookingStart,
+    bookingEnd: reservation.bookingEnd,
+    recordedAt: new Date(recordedAt).toISOString(),
+    reason: "auto-missed-checkin",
+  };
+}
+
+function syncMissedCheckinNotifications(reservations: Reservation[], options?: SyncOptions) {
+  if (!reservations.length) return;
+
+  const now = options?.now ?? Date.now();
+  const targetUserId = options?.targetUserId;
+  const relevant = targetUserId === undefined
+    ? reservations
+    : reservations.filter((reservation) => reservation.userId === targetUserId);
+
+  if (!relevant.length) {
+    return;
+  }
+
+  const existingRecords = loadCancellationRecords();
+  const existingByBooking = new Map<number, CancellationRecord>();
+  existingRecords.forEach((record) => {
+    existingByBooking.set(record.bookingId, record);
   });
 
-  lastKnownStatuses = nextStatuses;
+  const updatedStatuses = new Map(lastKnownStatuses);
+
+  relevant.forEach((reservation) => {
+    const normalizedStatus = reservation.status?.trim().toLowerCase() ?? null;
+    updatedStatuses.set(reservation.bookingId, normalizedStatus);
+
+    if (!shouldRecordMissedCheckin(reservation, now)) {
+      return;
+    }
+
+    if (existingByBooking.has(reservation.bookingId)) {
+      return;
+    }
+
+    const startMs = Date.parse(reservation.bookingStart);
+    if (Number.isNaN(startMs)) {
+      return;
+    }
+
+    const recordedAt = Math.max(startMs + CHECKIN_GRACE_MS, startMs);
+
+    const record = buildAutoMissedCheckinRecord(reservation, recordedAt);
+    addCancellationRecord(record);
+    existingByBooking.set(reservation.bookingId, record);
+  });
+
+  lastKnownStatuses = updatedStatuses;
+}
+
+export function syncMissedCheckinNotificationsForUser(
+  bookings: BookingResponse[],
+  userId: number,
+  options?: { now?: number }
+) {
+  if (!userId) return;
+  if (!bookings.length) return;
+
+  const reservations = bookings
+    .filter((booking) => booking.userId === userId)
+    .map((booking) => ({ ...booking } as Reservation));
+
+  if (!reservations.length) return;
+
+  syncMissedCheckinNotifications(reservations, { targetUserId: userId, now: options?.now });
 }
