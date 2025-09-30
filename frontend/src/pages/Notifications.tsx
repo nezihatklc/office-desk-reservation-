@@ -8,7 +8,7 @@ import {
   loadCheckoutRecords,
   USER_UNREAD_FLAG_KEY,
 } from "../lib/notificationStore";
-import { syncMissedCheckinNotificationsForUser } from "../lib/reservations";
+import { syncReservationNotificationsForUser } from "../lib/reservations";
 
 const READ_STORAGE_KEY = "notifications:read-ids";
 
@@ -134,7 +134,7 @@ export default function NotificationsPage() {
         const bookings = await listUpcomingBookings();
         if (cancelled) return;
         const mine = bookings.filter((booking) => booking.userId === userId);
-        syncMissedCheckinNotificationsForUser(bookings, userId);
+        syncReservationNotificationsForUser(bookings, userId);
         const storedIds = loadStoredReadIds();
         setReadIds(storedIds);
         const bookingNotifications = mine.map<NotificationItem>((booking) => {
