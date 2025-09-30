@@ -41,8 +41,12 @@ export default function Login() {
           nav("/floor", { replace: true });
         }
       }
-    } catch (error: any) {
-      setErr(error.message || "Login failed. Please try again.");
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setErr(error.message || "Login failed. Please try again.");
+      } else {
+        setErr("Login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
