@@ -26,7 +26,7 @@ namespace backend.Data
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
 #warning Move your connection string to appsettings.json for safety
-            => optionsBuilder.UseNpgsql("Host=localhost;Port=5433;Database=Andromeda;Username=postgres;Password=200112");
+            => optionsBuilder.UseNpgsql("Host=localhost;Port=5433;Database=Andromeda;Username=postgres;Password=your_password_here");
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder
