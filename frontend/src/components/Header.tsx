@@ -10,6 +10,10 @@ export default function Header() {
   const { pathname } = useLocation();
   const isAdmin = user?.role?.toLowerCase() === "admin";
 
+  const userDisplayName = user
+    ? [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.email
+    : "";
+
   const notificationsPath = isAdmin ? "/admin/notifications" : "/notifications";
   const unreadFlagKey = isAdmin ? "notifications:admin:lastUnread" : "notifications:lastUnread";
 
@@ -120,7 +124,7 @@ export default function Header() {
               {hasUnreadNotifications && <span className="notification-indicator" aria-hidden="true" />}
             </Link>
             <span className="text-sm text-white/80">
-              Signed in as <strong>{user.email}</strong>
+              Welcome <strong>{userDisplayName}</strong>
             </span>
             <button
               className="signout-btn"
