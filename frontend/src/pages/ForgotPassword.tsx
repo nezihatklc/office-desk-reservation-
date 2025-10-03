@@ -6,7 +6,6 @@ import logo from "../assets/dfds-logo.png";
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isDev = import.meta.env.DEV;
-const AUTO_REDIRECT_SECONDS = 5;
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -15,7 +14,8 @@ export default function ForgotPassword() {
   const [devToken, setDevToken] = useState<string | undefined>();
   const [devResetUrl, setDevResetUrl] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [redirectSeconds, setRedirectSeconds] = useState<number | null>(null);
+  const [lastRequestedEmail, setLastRequestedEmail] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<"url" | "token" | null>(null);
 
   const { forgotPassword } = useAuth();
   const navigate = useNavigate();
@@ -30,7 +30,8 @@ export default function ForgotPassword() {
     setMessage(null);
     setDevToken(undefined);
     setDevResetUrl(undefined);
-    setRedirectSeconds(null);
+    setLastRequestedEmail(null);
+    setCopiedField(null);
     setIsSubmitting(true);
 
     try {
@@ -45,7 +46,7 @@ export default function ForgotPassword() {
         setMessage(serverMessage ?? "If the email exists in our system, a reset link has been sent.");
         setDevToken(devToken);
         setDevResetUrl(devResetUrl);
-        setRedirectSeconds(AUTO_REDIRECT_SECONDS);
+        setLastRequestedEmail(trimmedEmail);
       }
     } finally {
       setIsSubmitting(false);
@@ -53,20 +54,34 @@ export default function ForgotPassword() {
   }
 
   useEffect(() => {
-    if (redirectSeconds === null) return undefined;
-    if (redirectSeconds <= 0) {
-      const trimmedEmail = email.trim();
-      const search = trimmedEmail ? `?email=${encodeURIComponent(trimmedEmail)}` : "";
-      navigate(`/reset-password${search}`, { replace: false });
-      return undefined;
-    }
-
-    const timerId = window.setTimeout(() => {
-      setRedirectSeconds((prev) => (prev === null ? null : prev - 1));
-    }, 1000);
-
+    if (!copiedField) return undefined;
+    const timerId = window.setTimeout(() => setCopiedField(null), 1800);
     return () => window.clearTimeout(timerId);
-  }, [redirectSeconds, navigate, email]);
+  }, [copiedField]);
+
+  function handleOpenResetForm() {
+    const targetEmail = (lastRequestedEmail ?? email).trim();
+    const search = targetEmail ? `?email=${encodeURIComponent(targetEmail)}` : "";
+    navigate(`/reset-password${search}`, { replace: false });
+  }
+
+  async function handleCopy(value: string, field: "url" | "token") {
+    if (!value) return;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        setCopiedField(field);
+        return;
+      }
+
+      throw new Error("Clipboard API not available");
+    } catch (err) {
+      console.error("clipboard write failed", err);
+      if (typeof window !== "undefined") {
+        window.prompt("Copy to clipboard:", value);
+      }
+    }
+  }
 
   return (
     <div className="auth-page">
@@ -83,10 +98,14 @@ export default function ForgotPassword() {
           </div>
         )}
 
-        {redirectSeconds !== null && redirectSeconds > 0 && (
-          <p className="muted auth-hint" role="status">
-            Redirecting to the reset form in {redirectSeconds} second{redirectSeconds === 1 ? "" : "s"}…
-          </p>
+        {message && (
+          <button
+            type="button"
+            className="btn btn-primary btn-block btn-lg forgot-next-btn"
+            onClick={handleOpenResetForm}
+          >
+            Open reset form
+          </button>
         )}
 
         {error && (
@@ -140,17 +159,37 @@ export default function ForgotPassword() {
         </p>
 
         {isDev && (devResetUrl || devToken) && (
-          <details>
-            <summary>Developer info</summary>
-            <ul>
-              {devResetUrl && (
-                <li>
-                  Reset URL: <a href={devResetUrl}>{devResetUrl}</a>
-                </li>
-              )}
-              {devToken && <li>Token: {devToken}</li>}
-            </ul>
-          </details>
+          <div className="dev-info" role="note" aria-live="polite">
+            <div className="dev-info__header">
+              <span className="dev-info__title">Developer info</span>
+            </div>
+            {devResetUrl && (
+              <div className="dev-info__item">
+                <span className="dev-info__label">Reset URL</span>
+                <code className="dev-info__value" tabIndex={0}>{devResetUrl}</code>
+                <button
+                  type="button"
+                  className="dev-info__copy"
+                  onClick={() => handleCopy(devResetUrl, "url")}
+                >
+                  {copiedField === "url" ? "Copied" : "Copy"}
+                </button>
+              </div>
+            )}
+            {devToken && (
+              <div className="dev-info__item">
+                <span className="dev-info__label">Token</span>
+                <code className="dev-info__value" tabIndex={0}>{devToken}</code>
+                <button
+                  type="button"
+                  className="dev-info__copy"
+                  onClick={() => handleCopy(devToken, "token")}
+                >
+                  {copiedField === "token" ? "Copied" : "Copy"}
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
