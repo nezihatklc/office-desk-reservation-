@@ -332,11 +332,11 @@ export default function FloorPlan({
 
       hl.style.opacity = "1";
       if (mode === "selected") {
-        hl.setAttribute("fill", "rgba(73,162,223,0.16)");
-        hl.setAttribute("stroke", "rgba(73,162,223,0.65)");
+        hl.setAttribute("fill", "var(--floorplan-highlight-selected-fill)");
+        hl.setAttribute("stroke", "var(--floorplan-highlight-selected-stroke)");
       } else {
-        hl.setAttribute("fill", "rgba(255,255,255,0.10)");
-        hl.setAttribute("stroke", "rgba(255,255,255,0.35)");
+        hl.setAttribute("fill", "var(--floorplan-highlight-hover-fill)");
+        hl.setAttribute("stroke", "var(--floorplan-highlight-hover-stroke)");
       }
     }
 
@@ -441,8 +441,8 @@ export default function FloorPlan({
         margin: "0 auto",
         borderRadius: "18px",
         overflow: "hidden",
-        background: "rgba(9, 33, 55, 0.35)",
-        boxShadow: "0 16px 36px rgba(8, 26, 43, 0.28)",
+        background: "var(--floorplan-surface-card)",
+        boxShadow: "var(--floorplan-shadow-card)",
         cursor: panEnabled ? (isDragging ? "grabbing" : "grab") : "default",
         userSelect: isDragging ? "none" : "auto",
         touchAction: panEnabled ? "none" : "auto",
@@ -476,10 +476,10 @@ export default function FloorPlan({
           bottom: 16,
           left: 16,
           padding: "10px 14px",
-          background: "rgba(9, 33, 55, 0.78)",
+          background: "var(--floorplan-surface-control)",
           borderRadius: 14,
-          boxShadow: "0 12px 24px rgba(7, 25, 44, 0.3)",
-          color: "#f1f7ff",
+          boxShadow: "var(--floorplan-shadow-control)",
+          color: "var(--floorplan-text-on-dark)",
           display: "flex",
           alignItems: "center",
           gap: 12,
@@ -507,7 +507,7 @@ export default function FloorPlan({
             onChange={handleSliderChange}
             aria-label="Adjust floor plan zoom"
             style={{
-              accentColor: "#49a2df",
+              accentColor: "var(--floorplan-slider-accent)",
               width: 140,
               cursor: "pointer",
             }}
@@ -525,11 +525,11 @@ export default function FloorPlan({
             height: 34,
             borderRadius: "50%",
             border: "none",
-            background: "rgba(255, 255, 255, 0.16)",
-            color: "#f1f7ff",
+            background: "var(--floorplan-surface-button)",
+            color: "var(--floorplan-text-on-dark)",
             fontSize: "1rem",
             cursor: canZoomOut ? "pointer" : "not-allowed",
-            boxShadow: "0 6px 14px rgba(7, 25, 44, 0.3)",
+            boxShadow: "var(--floorplan-shadow-button)",
           }}
         >
           -
@@ -544,11 +544,11 @@ export default function FloorPlan({
             height: 34,
             borderRadius: "50%",
             border: "none",
-            background: "rgba(255, 255, 255, 0.16)",
-            color: "#f1f7ff",
+            background: "var(--floorplan-surface-button)",
+            color: "var(--floorplan-text-on-dark)",
             fontSize: "1.05rem",
             cursor: canZoomIn ? "pointer" : "not-allowed",
-            boxShadow: "0 6px 14px rgba(7, 25, 44, 0.3)",
+            boxShadow: "var(--floorplan-shadow-button)",
           }}
         >
           +
@@ -562,11 +562,11 @@ export default function FloorPlan({
             padding: "6px 12px",
             borderRadius: 999,
             border: "none",
-            background: "rgba(255, 255, 255, 0.22)",
-            color: "#f1f7ff",
+            background: "var(--floorplan-surface-button-strong)",
+            color: "var(--floorplan-text-on-dark)",
             fontSize: "0.74rem",
             cursor: Math.abs(zoom - 1) < 0.01 ? "not-allowed" : "pointer",
-            boxShadow: "0 6px 14px rgba(7, 25, 44, 0.28)",
+            boxShadow: "var(--floorplan-shadow-button-strong)",
           }}
         >
           Reset
@@ -579,12 +579,12 @@ export default function FloorPlan({
             position: "absolute",
             top: 16,
             right: 16,
-            background: "rgba(8, 26, 43, 0.82)",
-            color: "#f1f7ff",
+            background: "var(--floorplan-surface-tooltip)",
+            color: "var(--floorplan-text-on-dark)",
             padding: "10px 16px",
             borderRadius: 12,
             fontSize: "0.9rem",
-            boxShadow: "0 10px 24px rgba(7, 25, 44, 0.35)",
+            boxShadow: "var(--floorplan-shadow-tooltip)",
           }}
         >
           <strong>{hoveredDesk?.label || selectedDesk?.label}</strong>
