@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import logo from "../assets/dfds-logo.png";
+
+const SUCCESS_REDIRECT_DELAY = 3500;
 
 function validatePassword(pw: string) {
   const trimmed = pw.trim();
@@ -28,6 +30,8 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
 
   const { resetPassword } = useAuth();
   const navigate = useNavigate();
@@ -44,6 +48,8 @@ export default function ResetPassword() {
 
     setError(null);
     setMessage(null);
+    setShowSuccessModal(false);
+    setRedirectCountdown(null);
     setIsSubmitting(true);
 
     try {
@@ -58,13 +64,37 @@ export default function ResetPassword() {
         setMessage(serverMessage ?? "Password reset successfully. You can now log in with your new password.");
         setPassword("");
         setConfirm("");
-        setTimeout(() => {
-          navigate("/login", { replace: true });
-        }, 2500);
+        setShowSuccessModal(true);
       }
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  useEffect(() => {
+    if (!showSuccessModal) return undefined;
+
+    setRedirectCountdown(Math.ceil(SUCCESS_REDIRECT_DELAY / 1000));
+
+    const timeoutId = window.setTimeout(() => {
+      navigate("/login", { replace: true });
+    }, SUCCESS_REDIRECT_DELAY);
+
+    const intervalId = window.setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev === null) return null;
+        return prev > 0 ? prev - 1 : 0;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [showSuccessModal, navigate]);
+
+  function handleGoToLogin() {
+    navigate("/login", { replace: true });
   }
 
   return (
@@ -77,12 +107,6 @@ export default function ResetPassword() {
         <p className="auth-hint">
           Choose a new password for your account{email ? ` (${email})` : ""}.
         </p>
-
-        {message && (
-          <div className="form-success" role="status">
-            {message}
-          </div>
-        )}
 
         {error && (
           <div className="form-error" role="alert">
@@ -166,6 +190,26 @@ export default function ResetPassword() {
           </Link>
         </p>
       </div>
+
+      {showSuccessModal && (
+        <div
+          className="modal-backdrop"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="reset-success-title"
+        >
+          <div className="modal-card">
+            <h2 id="reset-success-title">Password reset ✅</h2>
+            <p>{message ?? "Your password has been updated."}</p>
+            <p className="muted">
+              Redirecting to login{redirectCountdown ? ` in ${redirectCountdown} second${redirectCountdown === 1 ? "" : "s"}` : ""}…
+            </p>
+            <button type="button" className="btn btn-primary" onClick={handleGoToLogin}>
+              Go to login now
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
