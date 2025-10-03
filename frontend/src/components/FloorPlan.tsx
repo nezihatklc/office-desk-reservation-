@@ -133,8 +133,8 @@ export default function FloorPlan({
       const pressedOnDesk = Boolean(deskHit);
 
       const handleMove = (moveEvent: PointerEvent) => {
-        const deltaX = (moveEvent.clientX - startX) / zoom;
-        const deltaY = (moveEvent.clientY - startY) / zoom;
+        const deltaX = moveEvent.clientX - startX;
+        const deltaY = moveEvent.clientY - startY;
         if (!moved && (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1)) {
           moved = true;
         }
@@ -181,8 +181,8 @@ export default function FloorPlan({
     const extraHeight = Math.max(0, height * (zoom - 1));
 
     const nextLimit = {
-      x: extraWidth > 0 ? extraWidth / (2 * (zoom || 1)) : 0,
-      y: extraHeight > 0 ? extraHeight / (2 * (zoom || 1)) : 0,
+      x: extraWidth > 0 ? extraWidth / 2 : 0,
+      y: extraHeight > 0 ? extraHeight / 2 : 0,
     };
 
     setPanLimit(nextLimit);
