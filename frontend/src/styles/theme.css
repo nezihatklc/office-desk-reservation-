@@ -11,13 +11,13 @@
   --colors-primary-dark:  #00001E;
 
   /* Secondary (accent) */
-  --colors-secondary-light: #BBDD F3; /* istersen #BB DDF3 tek boşluksuz yaz */
+  --colors-secondary-light: #BBDDF3; /* istersen #BBDDF3 tek boşluksuz yaz */
   --colors-secondary-main:  #49A2DF;
   --colors-secondary-dark:  #1874BC;
 
   /* Status */
   --colors-status-info:          #002B45;
-  --colors-status-infomuted:     #BBDD F3;
+  --colors-status-infomuted:     #BBDDF3;
   --colors-status-success:       #4CAF50;
   --colors-status-successmuted:  #B0E0D9; /* ekran görüntüsüne yakın yumuşak yeşil */
   --colors-status-warning:       #FEB800;
@@ -42,6 +42,24 @@
   --radius-lg: 16px;
   --gap: 12px;
   --container: 1080px;
+
+  /* Floor plan overlays */
+  --floorplan-surface-card: rgba(9, 33, 55, 0.35);
+  --floorplan-shadow-card: 0 16px 36px rgba(8, 26, 43, 0.28);
+  --floorplan-surface-control: rgba(9, 33, 55, 0.78);
+  --floorplan-shadow-control: 0 12px 24px rgba(7, 25, 44, 0.3);
+  --floorplan-surface-button: rgba(255, 255, 255, 0.16);
+  --floorplan-shadow-button: 0 6px 14px rgba(7, 25, 44, 0.3);
+  --floorplan-surface-button-strong: rgba(255, 255, 255, 0.22);
+  --floorplan-shadow-button-strong: 0 6px 14px rgba(7, 25, 44, 0.28);
+  --floorplan-surface-tooltip: rgba(8, 26, 43, 0.82);
+  --floorplan-shadow-tooltip: 0 10px 24px rgba(7, 25, 44, 0.35);
+  --floorplan-text-on-dark: #f1f7ff;
+  --floorplan-highlight-selected-fill: rgba(73, 162, 223, 0.16);
+  --floorplan-highlight-selected-stroke: rgba(73, 162, 223, 0.65);
+  --floorplan-highlight-hover-fill: rgba(255, 255, 255, 0.1);
+  --floorplan-highlight-hover-stroke: rgba(255, 255, 255, 0.35);
+  --floorplan-slider-accent: var(--colors-secondary-main);
 
   /* Backward‑compat for existing files */
   --brand-900: var(--colors-primary-main);
